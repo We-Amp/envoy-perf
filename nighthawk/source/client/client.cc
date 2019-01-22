@@ -139,14 +139,9 @@ bool Main::run() {
       Envoy::Runtime::LoaderImpl runtime(generator, *store, tls);
       Envoy::Event::RealTimeSystem time_system;
 
-      Envoy::Http::HeaderMapImplPtr request_headers =
-          std::make_unique<Envoy::Http::HeaderMapImpl>();
-      request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-
       // TODO(oschaaf): Pass in a request generator here.
-      auto client =
-          std::make_unique<BenchmarkHttpClient>(*dispatcher, *store, time_system, options_->uri(),
-                                                std::move(request_headers), options_->h2());
+      auto client = std::make_unique<BenchmarkHttpClient>(*dispatcher, *store, time_system,
+                                                          options_->uri(), options_->h2());
       client->set_connection_timeout(options_->timeout());
       client->set_connection_limit(options_->connections());
       client->initialize(runtime);

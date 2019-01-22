@@ -1,7 +1,9 @@
 #pragma once
 
 #include <functional>
+#include <queue>
 
+#include "common/common/assert.h"
 #include "common/http/codec_wrappers.h"
 
 namespace Nighthawk {
@@ -18,10 +20,10 @@ public:
  */
 class StreamDecoder : public Envoy::Http::StreamDecoder, public Envoy::Http::StreamCallbacks {
 public:
-  StreamDecoder(std::function<void()> caller_completion_callback,
-                StreamDecoderCompletionCallback& on_complete_cb)
-      : caller_completion_callback_(std::move(caller_completion_callback)),
-        on_complete_cb_(on_complete_cb) {}
+  StreamDecoder() : on_complete_cb_() {}
+
+  void setCallbacks(std::function<void()> caller_completion_callback,
+                    StreamDecoderCompletionCallback* on_complete_cb);
 
   bool complete() { return complete_; }
   const Envoy::Http::HeaderMap& headers() { return *headers_; }
@@ -38,13 +40,42 @@ public:
   void onAboveWriteBufferHighWatermark() override {}
   void onBelowWriteBufferLowWatermark() override {}
 
+  void reset();
+
 private:
   void onComplete(bool success);
 
   Envoy::Http::HeaderMapPtr headers_;
   bool complete_{};
   std::function<void()> caller_completion_callback_;
-  StreamDecoderCompletionCallback& on_complete_cb_;
+  StreamDecoderCompletionCallback* on_complete_cb_;
+};
+
+class StreamDecoderPool {
+public:
+  StreamDecoderPool(uint64_t size) : size_(size) {
+    for (uint64_t i = 0; i < size; i++) {
+      pool_.emplace(StreamDecoder());
+    }
+  }
+
+  ~StreamDecoderPool() { ASSERT(pool_.size() == size_); };
+
+  StreamDecoder& pop() {
+    if (pool_.size() == 0) {
+      // TODO(oschaaf): should we warn here?
+      pool_.emplace(StreamDecoder());
+      size_++;
+    }
+
+    auto& r = pool_.front();
+    pool_.pop();
+    return r;
+  }
+  void push(StreamDecoder&& decoder) { pool_.emplace(std::move(decoder)); }
+
+  uint64_t size_;
+  std::queue<StreamDecoder> pool_;
 };
 
 } // namespace Http

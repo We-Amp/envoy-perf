@@ -22,8 +22,7 @@ class BenchmarkHttpClient : public Nighthawk::Http::StreamDecoderCompletionCallb
                             public Envoy::Http::ConnectionPool::Callbacks {
 public:
   BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::Stats::Store& store,
-                      Envoy::TimeSource& time_source, const std::string& uri,
-                      Envoy::Http::HeaderMapImplPtr&& request_headers, bool use_h2);
+                      Envoy::TimeSource& time_source, const std::string& uri, bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
   void initialize(Envoy::Runtime::LoaderImpl& runtime);
@@ -81,6 +80,8 @@ private:
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool allow_pending_for_test_;
+
+  std::unique_ptr<Http::StreamDecoderPool> decoder_pool_;
 };
 
 } // namespace Client

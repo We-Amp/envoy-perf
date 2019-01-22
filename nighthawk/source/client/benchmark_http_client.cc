@@ -30,15 +30,17 @@ namespace Client {
 
 BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Stats::Store& store, Envoy::TimeSource& time_source,
-                                         const std::string& uri,
-                                         Envoy::Http::HeaderMapImplPtr&& request_headers,
-                                         bool use_h2)
+                                         const std::string& uri, bool use_h2)
     : dispatcher_(dispatcher), store_(store), time_source_(time_source),
-      request_headers_(std::move(request_headers)), use_h2_(use_h2), is_https_(false), host_(""),
-      port_(0), path_("/"), dns_failure_(true), timeout_(5s), connection_limit_(1),
-      max_pending_requests_(1), pool_overflow_failures_(0), stream_reset_count_(0),
-      http_good_response_count_(0), http_bad_response_count_(0), requests_completed_(0),
-      requests_initiated_(0), allow_pending_for_test_(false) {
+      request_headers_(std::make_unique<Envoy::Http::HeaderMapImpl>()), use_h2_(use_h2),
+      is_https_(false), host_(""), port_(0), path_("/"), dns_failure_(true), timeout_(5s),
+      connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
+      stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
+      requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false),
+      // TODO(oschaaf): work on initializing the pool at exactly the right size.
+      // Right now we initialize it with a fairly big size, which will do for
+      // now.
+      decoder_pool_(std::make_unique<Http::StreamDecoderPool>(1000)) {
 
   // parse incoming uri into fields that we need.
   // TODO(oschaaf): refactor. also input validation, etc.
@@ -58,6 +60,7 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
     host_ = host_.substr(0, colon_index);
   }
 
+  request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(path_);
   request_headers_->insertHost().value(host_);
   request_headers_->insertScheme().value(is_https_ ? Envoy::Http::Headers::get().SchemeValues.Https
@@ -146,10 +149,16 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  auto stream_decoder =
-      new Nighthawk::Http::StreamDecoder(std::move(caller_completion_callback), *this);
+  Http::StreamDecoder& stream_decoder = decoder_pool_->pop();
+  stream_decoder.setCallbacks(
+      [this, caller_completion_callback, &stream_decoder]() {
+        caller_completion_callback();
+        stream_decoder.reset();
+        decoder_pool_->push(std::move(stream_decoder));
+      },
+      this);
   requests_initiated_++;
-  pool_->newStream(*stream_decoder, *this);
+  pool_->newStream(stream_decoder, *this);
 
   return true;
 }

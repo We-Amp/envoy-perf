@@ -6,6 +6,14 @@
 namespace Nighthawk {
 namespace Http {
 
+std::vector<StreamDecoder*> pool;
+
+void StreamDecoder::setCallbacks(std::function<void()> caller_completion_callback,
+                                 StreamDecoderCompletionCallback* on_complete_cb) {
+  caller_completion_callback_ = caller_completion_callback;
+  on_complete_cb_ = on_complete_cb;
+}
+
 void StreamDecoder::decodeHeaders(Envoy::Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
@@ -27,15 +35,21 @@ void StreamDecoder::decodeTrailers(Envoy::Http::HeaderMapPtr&&) { NOT_IMPLEMENTE
 
 void StreamDecoder::onComplete(bool success) {
   ASSERT(complete_);
-  on_complete_cb_.onComplete(success, *headers_);
+  on_complete_cb_->onComplete(success, *headers_);
   caller_completion_callback_();
-  delete this;
 }
 
 void StreamDecoder::onResetStream(Envoy::Http::StreamResetReason) {
   // TODO(oschaaf): check if we need to do something here.
   // ADD_FAILURE();
   onComplete(false);
+}
+
+void StreamDecoder::reset() {
+  complete_ = false;
+  headers_.reset();
+  caller_completion_callback_ = nullptr;
+  on_complete_cb_ = nullptr;
 }
 
 } // namespace Http
