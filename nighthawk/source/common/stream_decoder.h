@@ -61,7 +61,7 @@ public:
 
   ~StreamDecoderPool() { ASSERT(pool_.size() == size_); };
 
-  StreamDecoder& pop() {
+  StreamDecoder* pop() {
     if (pool_.size() == 0) {
       // TODO(oschaaf): should we warn here?
       pool_.emplace(StreamDecoder());
@@ -70,7 +70,7 @@ public:
 
     auto& r = pool_.front();
     pool_.pop();
-    return r;
+    return &r;
   }
   void push(StreamDecoder&& decoder) { pool_.emplace(std::move(decoder)); }
 

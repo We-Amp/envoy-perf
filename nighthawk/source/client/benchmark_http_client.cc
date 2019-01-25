@@ -149,16 +149,18 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  Http::StreamDecoder& stream_decoder = decoder_pool_->pop();
-  stream_decoder.setCallbacks(
-      [this, caller_completion_callback, &stream_decoder]() {
+  // Http::StreamDecoder* stream_decoder = decoder_pool_->pop();
+  Http::StreamDecoder* stream_decoder = new Http::StreamDecoder();
+  stream_decoder->setCallbacks(
+      [caller_completion_callback, stream_decoder]() {
         caller_completion_callback();
-        stream_decoder.reset();
-        decoder_pool_->push(std::move(stream_decoder));
+        delete stream_decoder;
+        // stream_decoder->reset();
+        // decoder_pool_->push(std::move(*stream_decoder));
       },
       this);
   requests_initiated_++;
-  pool_->newStream(stream_decoder, *this);
+  pool_->newStream(*stream_decoder, *this);
 
   return true;
 }
