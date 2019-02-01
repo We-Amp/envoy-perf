@@ -14,6 +14,7 @@ envoy_cc_test(
         "rate_limiter_test.cc",
         "sequencer_test.cc",
         "streaming_stats_test.cc",
+        "utility_test.cc",
     ],
     data = [
         "certs.sh",

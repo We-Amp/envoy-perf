@@ -34,51 +34,34 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
                                          bool use_h2)
     : dispatcher_(dispatcher), store_(store), time_source_(time_source),
-      request_headers_(std::move(request_headers)), use_h2_(use_h2), is_https_(false), host_(""),
-      host_without_port_(""), port_(0), path_("/"), dns_failure_(true), timeout_(5s),
+      request_headers_(std::move(request_headers)), use_h2_(use_h2),
+      uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
       requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false) {
-  // parse incoming uri into fields that we need.
-  // TODO(oschaaf): refactor. also input validation, etc.
-  absl::string_view host, path;
-  Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);
-  host_ = std::string(host);
-  path_ = std::string(path);
-
-  const size_t colon_index = host_.find(':');
-  is_https_ = absl::StartsWith(uri, "https://");
-
-  if (colon_index == std::string::npos) {
-    port_ = is_https_ ? 443 : 80;
-    host_without_port_ = host_;
-  } else {
-    const std::string tcp_url = fmt::format("tcp://{}", host_);
-    port_ = Envoy::Network::Utility::portFromTcpUrl(tcp_url);
-    host_without_port_ = host_.substr(0, colon_index);
-  }
-
-  request_headers_->insertPath().value(path_);
-  request_headers_->insertHost().value(host_);
-  request_headers_->insertScheme().value(is_https_ ? Envoy::Http::Headers::get().SchemeValues.Https
-                                                   : Envoy::Http::Headers::get().SchemeValues.Http);
+  // TODO(oschaaf): handle uri_->isValid()
+  request_headers_->insertPath().value(uri_->path());
+  request_headers_->insertHost().value(uri_->host_and_port());
+  request_headers_->insertScheme().value(uri_->scheme() == "https"
+                                             ? Envoy::Http::Headers::get().SchemeValues.Https
+                                             : Envoy::Http::Headers::get().SchemeValues.Http);
 }
 
 void BenchmarkHttpClient::syncResolveDns() {
   auto dns_resolver = dispatcher_.createDnsResolver({});
   Envoy::Network::ActiveDnsQuery* active_dns_query_ = dns_resolver->resolve(
-      host_without_port_, Envoy::Network::DnsLookupFamily::V4Only,
+      uri_->host_without_port(), Envoy::Network::DnsLookupFamily::V4Only,
       [this, &active_dns_query_](
           const std::list<Envoy::Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
-        ENVOY_LOG(debug, "DNS resolution complete for {} ({} entries).", host_without_port_,
+        ENVOY_LOG(debug, "DNS resolution complete for {} ({} entries).", uri_->host_without_port(),
                   address_list.size());
         if (!address_list.empty()) {
           dns_failure_ = false;
           target_address_ =
-              Envoy::Network::Utility::getAddressWithPort(*address_list.front(), port_);
+              Envoy::Network::Utility::getAddressWithPort(*address_list.front(), uri_->port());
         } else {
-          ENVOY_LOG(critical, "Could not resolve host [{}]", host_without_port_);
+          ENVOY_LOG(critical, "Could not resolve host [{}]", uri_->host_without_port());
         }
         dispatcher_.exit();
       });
@@ -105,7 +88,7 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
                                                              : cluster_config.alt_stat_name()));
 
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
-  if (is_https_) {
+  if (uri_->scheme() == "https") {
     socket_factory = Envoy::Network::TransportSocketFactoryPtr{
         new Ssl::MClientSslSocketFactory(store_, time_source_, use_h2_)};
   } else {
@@ -120,8 +103,9 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
       std::make_shared<Envoy::Network::ConnectionSocket::Options>();
 
   auto host = std::shared_ptr<Envoy::Upstream::Host>{new Envoy::Upstream::HostImpl(
-      cluster_, host_, target_address_, envoy::api::v2::core::Metadata::default_instance(),
-      1 /* weight */, envoy::api::v2::core::Locality(),
+      cluster_, uri_->host_and_port(), target_address_,
+      envoy::api::v2::core::Metadata::default_instance(), 1 /* weight */,
+      envoy::api::v2::core::Locality(),
       envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
 
   if (use_h2_) {

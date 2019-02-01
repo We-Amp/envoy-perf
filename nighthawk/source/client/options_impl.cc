@@ -2,6 +2,8 @@
 
 #include "tclap/CmdLine.h"
 
+#include "common/utility.h"
+
 namespace Nighthawk {
 namespace Client {
 
@@ -80,6 +82,43 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv) {
   h2_ = h2.getValue();
   concurrency_ = concurrency.getValue();
   verbosity_ = verbosity.getValue();
+
+  uint64_t pretty_large_value = 1000 * 1000 * 1000;
+  // We cap on negative values. TCLAP accepts negative values which we will get here as very
+  // large values. We just cap values to a very large maximum.
+  if (requests_per_second_ == 0 || requests_per_second_ > pretty_large_value) {
+    throw MalformedArgvException("Invalid value for --requests_per_second");
+  }
+  if (connections_ == 0 || connections_ > pretty_large_value) {
+    throw MalformedArgvException("Invalid value for --connections");
+  }
+  if (duration_ == 0 || duration_ > pretty_large_value) {
+    throw MalformedArgvException("Invalid value for --duration");
+  }
+  if (timeout_ == 0 || timeout_ > pretty_large_value) {
+    throw MalformedArgvException("Invalid value for --timeout");
+  }
+  if (requests_per_second_ == 0 || requests_per_second_ > pretty_large_value) {
+    throw MalformedArgvException("Invalid value for --requests_per_second");
+  }
+
+  // concurrency must be either 'auto' or a positive integer.
+  if (concurrency_ != "auto") {
+    int parsed_concurrency;
+    try {
+      parsed_concurrency = std::stoi(concurrency_);
+    } catch (const std::invalid_argument& ia) {
+      throw MalformedArgvException("Invalid value for --concurrency");
+    } catch (const std::out_of_range& oor) {
+      throw MalformedArgvException("Invalid value for --concurrency");
+    }
+    if (parsed_concurrency <= 0) {
+      throw MalformedArgvException("Invalid value for --concurrency");
+    }
+  }
+  if (!Uri::Parse(uri_).isValid()) {
+    throw MalformedArgvException("Invalid URI");
+  }
 }
 
 CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
@@ -89,7 +128,7 @@ CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_connections(connections());
   command_line_options->mutable_duration()->set_seconds(duration().count());
   command_line_options->set_requests_per_second(requests_per_second());
-  command_line_options->mutable_duration()->set_seconds(timeout().count());
+  command_line_options->mutable_timeout()->set_seconds(timeout().count());
   command_line_options->set_h2(h2());
   command_line_options->set_uri(uri());
   command_line_options->set_concurrency(concurrency());

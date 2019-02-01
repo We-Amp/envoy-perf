@@ -20,6 +20,7 @@ envoy_cc_library(
         "ssl.h",
         "stream_decoder.h",
         "streaming_stats.h",
+        "utility.h",
     ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
