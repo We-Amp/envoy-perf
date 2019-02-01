@@ -1,18 +1,10 @@
-licenses(["notice"])  # Apache 2
-
-load(
-    "//bazel:nighthawk.bzl",
-    "nighthawk_cc_platform_dep",
-)
+load("@envoy//api/bazel:api_build_system.bzl", "api_proto_library_internal")
 load(
     "@envoy//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_library",
-    "envoy_cc_posix_library",
-    "envoy_cc_win32_library",
 )
-load("@envoy//api/bazel:api_build_system.bzl", "api_proto_library_internal")
-load("@envoy//bazel:repositories.bzl", "PPC_SKIP_TARGETS")
+
+licenses(["notice"])  # Apache 2
 
 api_proto_library_internal(
     name = "benchmark_options",
@@ -26,6 +18,7 @@ envoy_cc_library(
         "benchmark_http_client.cc",
         "client.cc",
         "options_impl.cc",
+        "utility.cc",
     ],
     hdrs = [
         "benchmark_http_client.h",

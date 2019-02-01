@@ -13,6 +13,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/stream_decoder.h"
+#include "common/utility.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -61,12 +62,9 @@ private:
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   const bool use_h2_;
-
-  bool is_https_;
-  std::string host_;
-  std::string host_without_port_;
-  uint32_t port_;
-  std::string path_;
+  const std::unique_ptr<Uri> uri_;
+  // dns_failure_ will be set by syncResolveDns. If false, the benchmark client should be disposed,
+  // as it isn't further usable.
   bool dns_failure_;
   Envoy::Network::Address::InstanceConstSharedPtr target_address_;
   std::chrono::seconds timeout_;
