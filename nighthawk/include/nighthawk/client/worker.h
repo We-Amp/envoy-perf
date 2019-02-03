@@ -6,7 +6,8 @@ namespace Nighthawk {
 namespace Client {
 
 /**
- * Interface for a threaded benchmark client worker. All routines are thread safe.
+ * @brief Interface for a threaded benchmark client worker.
+ *
  */
 class Worker {
 public:

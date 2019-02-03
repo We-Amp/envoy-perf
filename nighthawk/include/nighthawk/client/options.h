@@ -12,6 +12,10 @@ namespace Client {
 
 typedef std::unique_ptr<nighthawk::client::CommandLineOptions> CommandLineOptionsPtr;
 
+/**
+ * @brief Options interface
+ *
+ */
 class Options {
 public:
   virtual ~Options() {}
