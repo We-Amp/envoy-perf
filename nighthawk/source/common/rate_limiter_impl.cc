@@ -1,4 +1,4 @@
-#include "common/rate_limiter.h"
+#include "common/rate_limiter_impl.h"
 
 #include "common/common/assert.h"
 
@@ -7,7 +7,7 @@
 namespace Nighthawk {
 
 LinearRateLimiter::LinearRateLimiter(Envoy::TimeSource& time_source, const Frequency frequency)
-    : RateLimiter(time_source), acquireable_count_(0), acquired_count_(0), frequency_(frequency),
+    : time_source_(time_source), acquireable_count_(0), acquired_count_(0), frequency_(frequency),
       started_at_(time_source_.monotonicTime()) {
   ASSERT(frequency.value() > 0, "Frequency must be > 0");
 }

@@ -8,14 +8,14 @@ licenses(["notice"])  # Apache 2
 envoy_cc_library(
     name = "nighthawk_common_lib",
     srcs = [
-        "rate_limiter.cc",
+        "rate_limiter_impl.cc",
         "sequencer.cc",
         "stream_decoder.cc",
         "streaming_stats.cc",
     ],
     hdrs = [
         "frequency.h",
-        "rate_limiter.h",
+        "rate_limiter_impl.h",
         "sequencer.h",
         "ssl.h",
         "stream_decoder.h",
