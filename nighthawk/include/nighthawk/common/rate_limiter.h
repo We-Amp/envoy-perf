@@ -1,12 +1,5 @@
 #pragma once
 
-#include "common/common/logger.h"
-#include "envoy/common/time.h"
-
-#include "nighthawk/common/rate_limiter.h"
-
-#include "common/frequency.h"
-
 namespace Nighthawk {
 
 class RateLimiter {
