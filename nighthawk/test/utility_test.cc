@@ -18,6 +18,16 @@ public:
     EXPECT_EQ(path, uri.path());
     EXPECT_TRUE(uri.isValid());
   }
+
+  int32_t getCpuCountFromSet(cpu_set_t& set) {
+    int32_t count = 0;
+    for (int i = 0; i < CPU_SETSIZE; i++) {
+      if (CPU_ISSET(i, &set)) {
+        ++count;
+      }
+    }
+    return count;
+  }
 };
 
 TEST_F(UtilityTest, PerfectlyFineUrl) {
@@ -50,6 +60,28 @@ TEST_F(UtilityTest, ExplicitPort) {
 TEST_F(UtilityTest, SchemeWeDontUnderstand) {
   Uri u = Uri::Parse("foo://a");
   EXPECT_FALSE(u.isValid());
+}
+
+// TODO(oschaaf): we probably want to move this out to another file.
+TEST_F(UtilityTest, CpusWithAffinity) {
+  cpu_set_t original_set;
+  CPU_ZERO(&original_set);
+  EXPECT_EQ(0, sched_getaffinity(0, sizeof(original_set), &original_set));
+
+  uint32_t original_cpu_count = PlatformUtils::determineCpuCoresWithAffinity();
+  EXPECT_EQ(original_cpu_count, getCpuCountFromSet(original_set));
+
+  // Now the test, we set affinity to just the first cpu. We expect that to be reflected.
+  // This will be a no-op on a single core system.
+  cpu_set_t test_set;
+  CPU_ZERO(&test_set);
+  CPU_SET(0, &test_set);
+  EXPECT_EQ(0, sched_setaffinity(0, sizeof(test_set), &test_set));
+  EXPECT_EQ(1, PlatformUtils::determineCpuCoresWithAffinity());
+
+  // Restore affinity to what it was.
+  EXPECT_EQ(0, sched_setaffinity(0, sizeof(original_set), &original_set));
+  EXPECT_EQ(original_cpu_count, PlatformUtils::determineCpuCoresWithAffinity());
 }
 
 } // namespace Nighthawk

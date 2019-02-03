@@ -2,6 +2,10 @@
 
 namespace Nighthawk {
 
+namespace PlatformUtils {
+uint32_t determineCpuCoresWithAffinity();
+}
+
 class Uri {
 public:
   static Uri Parse(std::string uri) { return Uri(uri); }

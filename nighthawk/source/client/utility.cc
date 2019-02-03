@@ -9,6 +9,32 @@
 
 namespace Nighthawk {
 
+namespace PlatformUtils {
+
+// returns 0 on failure. returns the number of HW CPU's
+// that the current thread has affinity with.
+// TODO(oschaaf): mull over what to do w/regard to hyperthreading.
+uint32_t determineCpuCoresWithAffinity() {
+  uint32_t concurrency = 0;
+  int i;
+  pthread_t thread = pthread_self();
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  i = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
+  if (i != 0) {
+    return 0;
+  } else {
+    for (i = 0; i < CPU_SETSIZE; i++) {
+      if (CPU_ISSET(i, &cpuset)) {
+        concurrency++;
+      }
+    }
+  }
+  return concurrency;
+}
+
+} // namespace PlatformUtils
+
 Uri::Uri(std::string uri) : scheme_("http") {
   absl::string_view host, path;
   Envoy::Http::Utility::extractHostPathFromUri(uri, host, path);

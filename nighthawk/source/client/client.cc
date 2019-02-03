@@ -22,36 +22,12 @@
 #include "common/rate_limiter_impl.h"
 #include "common/sequencer.h"
 #include "common/streaming_stats.h"
+#include "common/utility.h"
 
 using namespace std::chrono_literals;
 
 namespace Nighthawk {
 namespace Client {
-namespace {
-
-// returns 0 on failure. returns the number of HW CPU's
-// that the current thread has affinity with.
-// TODO(oschaaf): mull over what to do w/regard to hyperthreading.
-uint32_t determine_cpu_cores_with_affinity() {
-  uint32_t concurrency = 0;
-  int i;
-  pthread_t thread = pthread_self();
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  i = pthread_getaffinity_np(thread, sizeof(cpu_set_t), &cpuset);
-  if (i != 0) {
-    return 0;
-  } else {
-    for (i = 0; i < CPU_SETSIZE; i++) {
-      if (CPU_ISSET(i, &cpuset)) {
-        concurrency++;
-      }
-    }
-  }
-  return concurrency;
-}
-
-} // namespace
 
 Main::Main(int argc, const char* const* argv)
     : Main(std::make_unique<Client::OptionsImpl>(argc, argv)) {}
@@ -82,7 +58,7 @@ bool Main::run() {
   auto logging_context = std::make_unique<Envoy::Logger::Context>(
       spdlog::level::from_str(options_->verbosity()), "[%T.%f][%t][%L] %v", log_lock);
 
-  uint32_t cpu_cores_with_affinity = determine_cpu_cores_with_affinity();
+  uint32_t cpu_cores_with_affinity = PlatformUtils::determineCpuCoresWithAffinity();
   if (cpu_cores_with_affinity == 0) {
     ENVOY_LOG(warn, "Failed to determine the number of cpus with affinity to our thread.");
     cpu_cores_with_affinity = std::thread::hardware_concurrency();
