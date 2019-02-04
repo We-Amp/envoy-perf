@@ -13,6 +13,7 @@ envoy_cc_library(
     copts = [
         "-std=gnu99",
         "-Wno-implicit-function-declaration",
+        "-Wno-error",
     ],
     repository = "@envoy",
     visibility = ["//visibility:public"],
