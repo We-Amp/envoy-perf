@@ -5,6 +5,13 @@ load(
     "envoy_cc_binary",
 )
 
+cc_library(
+    name = "hdrhistogram_c",
+    srcs = glob(["hdrhistogram_c/src/*.c"]),
+    hdrs = glob(["hdrhistogram_c/src/*.h"]),
+    visibility = ["//visibility:public"],
+)
+
 envoy_cc_binary(
     name = "nighthawk_client",
     repository = "@envoy",

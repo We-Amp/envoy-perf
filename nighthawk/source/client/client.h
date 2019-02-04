@@ -6,6 +6,8 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/store.h"
 
+#include "hdrhistogram_c/src/hdr_histogram.h"
+
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"
 
@@ -27,6 +29,7 @@ private:
   Envoy::Network::Address::InstanceConstSharedPtr target_address_;
   WorkerPtr worker_;
   void configureComponentLogLevels(spdlog::level::level_enum level);
+  struct hdr_histogram* histogram_;
 };
 
 } // namespace Client

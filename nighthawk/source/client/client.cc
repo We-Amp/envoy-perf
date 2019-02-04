@@ -48,6 +48,7 @@ void Main::configureComponentLogLevels(spdlog::level::level_enum level) {
   Envoy::Logger::Registry::setLogLevel(level);
   Envoy::Logger::Logger* logger_to_change = Envoy::Logger::Registry::logger("main");
   logger_to_change->setLevel(level);
+  histogram_ = nullptr;
 }
 
 bool Main::run() {
