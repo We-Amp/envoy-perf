@@ -40,6 +40,7 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
       stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
       requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false) {
   // TODO(oschaaf): handle uri_->isValid()
+  request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(uri_->path());
   request_headers_->insertHost().value(uri_->host_and_port());
   request_headers_->insertScheme().value(uri_->scheme() == "https"

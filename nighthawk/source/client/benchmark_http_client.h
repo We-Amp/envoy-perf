@@ -22,6 +22,7 @@ class BenchmarkHttpClient : public Nighthawk::Http::StreamDecoderCompletionCallb
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main>,
                             public Envoy::Http::ConnectionPool::Callbacks {
 public:
+  // TODO(oschaaf): Pass in a request generator instead of just the request headers.
   BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::Stats::Store& store,
                       Envoy::TimeSource& time_source, const std::string& uri,
                       Envoy::Http::HeaderMapImplPtr&& request_headers, bool use_h2);

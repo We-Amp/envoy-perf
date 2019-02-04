@@ -66,8 +66,6 @@ bool Main::run() {
   }
 
   bool autoscale = options_->concurrency() == "auto";
-  // TODO(oschaaf): concurrency is a string option, this needs more sanity checking.
-  // The default for concurrency is one, in which case these warnings cannot show up.
   // TODO(oschaaf): Maybe, in the case where the concurrency flag is left out, but
   // affinity is set / we don't have affinity with all cores, we should default to autoscale.
   // (e.g. we are called via taskset).
@@ -117,20 +115,16 @@ bool Main::run() {
       Envoy::Runtime::LoaderImpl runtime(generator, *store, tls);
       Envoy::Event::RealTimeSystem time_system;
 
-      Envoy::Http::HeaderMapImplPtr request_headers =
-          std::make_unique<Envoy::Http::HeaderMapImpl>();
-      request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-
-      // TODO(oschaaf): Pass in a request generator here.
-      auto client =
-          std::make_unique<BenchmarkHttpClient>(*dispatcher, *store, time_system, options_->uri(),
-                                                std::move(request_headers), options_->h2());
+      auto client = std::make_unique<BenchmarkHttpClient>(
+          *dispatcher, *store, time_system, options_->uri(),
+          std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
       client->set_connection_timeout(options_->timeout());
       client->set_connection_limit(options_->connections());
       client->initialize(runtime);
 
       // We try to offset the start of each thread so that workers will execute tasks evenly spaced
       // in time.
+      // TODO(oschaaf): use dispatcher to sleep.
       double rate = 1 / double(options_->requests_per_second()) / concurrency;
       int64_t spread_us = static_cast<int64_t>(rate * i * 1000000);
       ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", i, spread_us);
