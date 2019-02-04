@@ -5,9 +5,10 @@
 
 #include "server/transport_socket_config_impl.h"
 
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "envoy/network/transport_socket.h"
 
@@ -120,7 +121,8 @@ public:
   MClientSslSocketFactory(Envoy::Stats::Store& store, Envoy::TimeSource& time_source, bool h2)
       : config_(h2), scope_(store.createScope(fmt::format("cluster.{}.", "ssl-client"))) {
     Envoy::Ssl::ClientContextSharedPtr context =
-        std::make_shared<Envoy::Ssl::ClientContextImpl>(*scope_, config_, time_source);
+        std::make_shared<Envoy::Extensions::TransportSockets::Tls::ClientContextImpl>(
+            *scope_, config_, time_source);
     ssl_ctx_ = context;
   }
 
@@ -128,8 +130,9 @@ public:
       Envoy::Network::TransportSocketOptionsSharedPtr transport_socket_options) const override {
     Envoy::Ssl::ClientContextSharedPtr ssl_ctx = ssl_ctx_;
     ASSERT(ssl_ctx);
-    return std::make_unique<Envoy::Ssl::SslSocket>(
-        std::move(ssl_ctx), Envoy::Ssl::InitialState::Client, transport_socket_options);
+    return std::make_unique<Envoy::Extensions::TransportSockets::Tls::SslSocket>(
+        std::move(ssl_ctx), Envoy::Extensions::TransportSockets::Tls::InitialState::Client,
+        transport_socket_options);
   }
 
   bool implementsSecureTransport() const override { return true; };
