@@ -104,9 +104,9 @@ bool Main::run() {
     // TODO(oschaaf): properly set up and use ThreadLocal::InstanceImpl.
     auto thread = thread_factory.createThread([&, i]() {
       auto store = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
-      auto api =
-          std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory, *store);
-      auto dispatcher = api->allocateDispatcher(*time_system_);
+      auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
+                                                    *store, *time_system_);
+      auto dispatcher = api->allocateDispatcher();
       StreamingStats& streaming_stats = global_streaming_stats[i];
 
       // TODO(oschaaf): not here.

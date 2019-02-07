@@ -22,8 +22,8 @@ namespace Nighthawk {
 class SequencerTest : public testing::Test {
 public:
   SequencerTest()
-      : api_(1000ms /*flush interval*/, thread_factory_, store_),
-        dispatcher_(api_.allocateDispatcher(time_system_)), callback_test_count_(0) {}
+      : api_(1000ms /*flush interval*/, thread_factory_, store_, time_system_),
+        dispatcher_(api_.allocateDispatcher()), callback_test_count_(0) {}
 
   bool callback_test(std::function<void()> f) {
     callback_test_count_++;
