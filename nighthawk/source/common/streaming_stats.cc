@@ -1,4 +1,4 @@
-#include "common/streaming_stats.h"
+#include "nighthawk/source/common/streaming_stats.h"
 
 namespace Nighthawk {
 

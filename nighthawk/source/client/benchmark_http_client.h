@@ -12,8 +12,8 @@
 #include "envoy/stats/store.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/stream_decoder.h"
-#include "common/utility.h"
+#include "nighthawk/source/common/stream_decoder.h"
+#include "nighthawk/source/common/utility.h"
 
 namespace Nighthawk {
 namespace Client {

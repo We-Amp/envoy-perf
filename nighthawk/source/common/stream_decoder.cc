@@ -1,4 +1,4 @@
-#include "common/stream_decoder.h"
+#include "nighthawk/source/common/stream_decoder.h"
 
 #include "common/http/http1/codec_impl.h"
 #include "common/http/utility.h"

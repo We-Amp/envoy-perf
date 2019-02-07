@@ -16,9 +16,9 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "client/benchmark_http_client.h"
-#include "common/rate_limiter_impl.h"
-#include "common/sequencer.h"
+#include "nighthawk/source/client/benchmark_http_client.h"
+#include "nighthawk/source/common/rate_limiter_impl.h"
+#include "nighthawk/source/common/sequencer.h"
 
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -44,7 +44,7 @@ public:
     // TODO(oschaaf): ask around how we should do this.
     Envoy::TestEnvironment::setEnvVar("TEST_TMPDIR", Envoy::TestEnvironment::temporaryDirectory(),
                                       1);
-    Envoy::TestEnvironment::exec({Envoy::TestEnvironment::runfilesPath("test/certs.sh")});
+    Envoy::TestEnvironment::exec({Envoy::TestEnvironment::runfilesPath("nighthawk/test/certs.sh")});
 
     const std::string body = R"EOF(
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam mauris felis, egestas eget turpis nec, ullamcorper laoreet magna. Donec ac condimentum lacus, nec semper eros. Sed iaculis arcu vitae egestas viverra. Nulla tempor, neque tempus tincidunt fermentum, orci nunc sagittis nisl, sed dapibus nunc ex sit amet justo. Ut porta pellentesque mi quis lobortis. Integer luctus, diam et mattis rhoncus, lacus orci condimentum tortor, vitae venenatis ante odio non massa. Duis ut nulla consectetur, elementum enim eu, maximus lacus. Ut id consequat libero. Mauris eget lorem et lorem iaculis laoreet a nec augue. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Maecenas ac cursus eros, ut eleifend lacus. Nam sit amet mauris nec mi luctus posuere. Phasellus ullamcorper vulputate purus sit amet dapibus. Mauris sit amet magna risus.

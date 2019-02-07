@@ -1,4 +1,4 @@
-#include "client/client.h"
+#include "nighthawk/source/client/client.h"
 
 #include <chrono>
 #include <fstream>
@@ -16,13 +16,13 @@
 #include "common/network/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "client/benchmark_http_client.h"
-#include "client/options_impl.h"
-#include "common/frequency.h"
-#include "common/rate_limiter_impl.h"
-#include "common/sequencer.h"
-#include "common/streaming_stats.h"
-#include "common/utility.h"
+#include "nighthawk/source/client/benchmark_http_client.h"
+#include "nighthawk/source/client/options_impl.h"
+#include "nighthawk/source/common/frequency.h"
+#include "nighthawk/source/common/rate_limiter_impl.h"
+#include "nighthawk/source/common/sequencer.h"
+#include "nighthawk/source/common/streaming_stats.h"
+#include "nighthawk/source/common/utility.h"
 
 using namespace std::chrono_literals;
 

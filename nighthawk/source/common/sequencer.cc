@@ -2,7 +2,7 @@
 
 #include "common/common/assert.h"
 
-#include "common/sequencer.h"
+#include "nighthawk/source/common/sequencer.h"
 
 using namespace std::chrono_literals;
 

@@ -9,7 +9,6 @@ envoy_cc_test(
     name = "nighthawk_test",
     srcs = [
         "benchmark_http_client_test.cc",
-        "frequency_test.cc",
         "options_test.cc",
         "rate_limiter_test.cc",
         "sequencer_test.cc",
@@ -22,7 +21,7 @@ envoy_cc_test(
     ],
     repository = "@envoy",
     deps = [
-        "//source/client:nighthawk_client_lib",
+        "//nighthawk/source/client:nighthawk_client_lib",
         "@envoy//test/integration:integration_lib",
         "@envoy//test/server:utility_lib",
     ],

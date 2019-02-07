@@ -2,7 +2,7 @@
 
 #include "test/test_common/utility.h"
 
-#include "client/options_impl.h"
+#include "nighthawk/source/client/options_impl.h"
 
 using namespace std::chrono_literals;
 

@@ -1,4 +1,4 @@
-#include "client/benchmark_http_client.h"
+#include "nighthawk/source/client/benchmark_http_client.h"
 
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -20,8 +20,8 @@
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
-#include "common/ssl.h"
-#include "common/stream_decoder.h"
+#include "nighthawk/source/common/ssl.h"
+#include "nighthawk/source/common/stream_decoder.h"
 
 using namespace std::chrono_literals;
 

@@ -1,8 +1,8 @@
-#include "client/options_impl.h"
+#include "nighthawk/source/client/options_impl.h"
 
 #include "tclap/CmdLine.h"
 
-#include "common/utility.h"
+#include "nighthawk/source/common/utility.h"
 
 namespace Nighthawk {
 namespace Client {

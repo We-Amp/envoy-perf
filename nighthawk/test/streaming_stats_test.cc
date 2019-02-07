@@ -6,7 +6,7 @@
 
 #include "nighthawk/common/exception.h"
 
-#include "common/streaming_stats.h"
+#include "nighthawk/source/common/streaming_stats.h"
 
 using namespace std::chrono_literals;
 

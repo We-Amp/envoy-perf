@@ -6,7 +6,7 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/store.h"
 
-#include "hdrhistogram_c/src/hdr_histogram.h"
+//#include "hdrhistogram_c/src/hdr_histogram.h"
 
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"

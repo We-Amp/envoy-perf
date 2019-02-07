@@ -22,8 +22,7 @@ envoy_cc_library(
 envoy_cc_binary(
     name = "nighthawk_client",
     repository = "@envoy",
-    stamped = True,
     deps = [
-        "//source/exe:nighthawk_client_entry_lib",
+        "//nighthawk/source/exe:nighthawk_client_entry_lib",
     ],
 )
