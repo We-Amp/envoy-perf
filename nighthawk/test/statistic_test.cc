@@ -29,9 +29,13 @@ TYPED_TEST(StatisticTest, SlightlyLessSimple) {
   stat.addValue(6543456);
   stat.addValue(342335);
   EXPECT_EQ(3, stat.count());
-  EXPECT_DOUBLE_EQ(2295675, stat.mean());
-  EXPECT_EQ(13561820041021, stat.variance());
-  EXPECT_DOUBLE_EQ(3682637.6472605884, stat.stdev());
+  // HdrHistogram is up to 5 digits precise.
+  // Note that we repeat this test with higher precision for
+  // the streaming stats below.
+  // TODO(oschaaf): think this through again.
+  EXPECT_NEAR(2295675, stat.mean(), 6);
+  EXPECT_NEAR(13561820041021, stat.variance(), 999999999);
+  EXPECT_NEAR(3682637.6472605884, stat.stdev(), 99);
 }
 
 class StreamingStatisticTest : public testing::Test {};
