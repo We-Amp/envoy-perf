@@ -15,7 +15,6 @@ function do_test() {
 }
 
 function do_clang_tidy() {
-    #cd ci/
     ci/run_clang_tidy.sh
 }
 

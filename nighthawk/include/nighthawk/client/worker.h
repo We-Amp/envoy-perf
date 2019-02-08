@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/common/pure.h"
+
 namespace Nighthawk {
 namespace Client {
 

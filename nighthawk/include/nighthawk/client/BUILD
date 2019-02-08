@@ -15,4 +15,7 @@ envoy_basic_cc_library(
         "worker.h",
     ],
     include_prefix = "nighthawk/client",
+    deps = [
+        "@envoy//include/envoy/common:base_includes",
+    ],
 )

@@ -29,7 +29,6 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":benchmark_options_cc",
-        "//nighthawk:hdrhistogram_c",
         "//nighthawk/include/nighthawk/client:client_includes",
         "//nighthawk/include/nighthawk/common:base_includes",
         "//nighthawk/source/common:nighthawk_common_lib",

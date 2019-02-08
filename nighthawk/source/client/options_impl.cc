@@ -8,8 +8,8 @@ namespace Nighthawk {
 namespace Client {
 
 OptionsImpl::OptionsImpl(int argc, const char* const* argv) {
-  TCLAP::CmdLine cmd("Nighthawk, a L7 HTTP protocol family benchmarking tool based on Envoy.", ' ',
-                     "PoC"); // NOLINT
+  const char* descr = "Nighthawk, a L7 HTTP protocol family benchmarking tool based on Envoy.";
+  TCLAP::CmdLine cmd(descr, ' ', "PoC"); // NOLINT
 
   TCLAP::ValueArg<uint64_t> requests_per_second("", "rps",
                                                 "The target requests-per-second rate. Default: 5.",
