@@ -1,5 +1,7 @@
 #include "nighthawk/source/common/streaming_stats.h"
 
+#include <cmath>
+
 namespace Nighthawk {
 
 StreamingStats::StreamingStats() : count_(0), mean_(0), sum_of_squares_(0) {}

@@ -21,10 +21,10 @@ if [[ "${RUN_FULL_CLANG_TIDY}" == 1 ]]; then
     run-clang-tidy-7
     elif [[ -z "${CIRCLE_PR_NUMBER}" && "$CIRCLE_BRANCH" == "master" ]]; then
     echo "On master branch, running clang-tidy-diff against previous commit..."
-    git diff HEAD^ | exclude_testdata | clang-tidy-diff-7.py -p 1
+    git diff HEAD^ | clang-tidy-diff-7.py -p 1
 else
     echo "Running clang-tidy-diff against master branch..."
     git fetch https://github.com/envoyproxy/envoy-perf.git master
     git diff $(git merge-base HEAD FETCH_HEAD)..HEAD | exclude_testdata | \
-    clang-tidy-diff-7.py -p 1
+    clang-tidy-diff-7.py -p 1 -x c++ 
 fi

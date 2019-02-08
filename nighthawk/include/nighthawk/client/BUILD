@@ -17,5 +17,6 @@ envoy_basic_cc_library(
     include_prefix = "nighthawk/client",
     deps = [
         "@envoy//include/envoy/common:base_includes",
+        "@envoy//source/common/protobuf",
     ],
 )

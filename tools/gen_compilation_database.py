@@ -35,6 +35,9 @@ def isCompileTarget(target, args):
         if filename.startswith("external/"):
             return False
 
+    if filename.startswith("google/protobuf"):
+        return False
+
     return True
 
 
