@@ -12,7 +12,6 @@ envoy_cc_library(
         "sequencer.cc",
         "statistic_impl.cc",
         "stream_decoder.cc",
-        "streaming_stats.cc",
     ],
     hdrs = [
         "frequency.h",
@@ -21,7 +20,6 @@ envoy_cc_library(
         "ssl.h",
         "statistic_impl.h",
         "stream_decoder.h",
-        "streaming_stats.h",
         "utility.h",
     ],
     repository = "@envoy",

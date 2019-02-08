@@ -21,7 +21,7 @@
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer.h"
-#include "nighthawk/source/common/streaming_stats.h"
+#include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/utility.h"
 
 using namespace std::chrono_literals;
@@ -73,7 +73,7 @@ bool Main::run() {
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<Envoy::Thread::ThreadPtr> threads;
   std::vector<std::vector<uint64_t>> global_results;
-  std::vector<StreamingStats> global_streaming_stats;
+  std::vector<StreamingStatistic> global_streaming_stats;
 
   // TODO(oschaaf): Wire up a proper stats sink.
   global_results.reserve(concurrency);
@@ -106,7 +106,7 @@ bool Main::run() {
       auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
                                                     *store, *time_system_);
       auto dispatcher = api->allocateDispatcher();
-      StreamingStats& streaming_stats = global_streaming_stats[i];
+      StreamingStatistic& streaming_stats = global_streaming_stats[i];
 
       // TODO(oschaaf): not here.
       Envoy::ThreadLocal::InstanceImpl tls;
@@ -175,7 +175,7 @@ bool Main::run() {
   }
 
   if (concurrency > 1) {
-    StreamingStats merged_global_stats = global_streaming_stats[0];
+    StreamingStatistic merged_global_stats = global_streaming_stats[0];
     for (uint32_t i = 1; i < concurrency; i++) {
       merged_global_stats = merged_global_stats.combine(global_streaming_stats[i]);
     }

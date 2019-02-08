@@ -7,7 +7,7 @@
 namespace Nighthawk {
 
 /**
- * Interface for tracking a statistic, encapsulating
+ * Abstract interface for a statistic.
  */
 class Statistic {
 public:
@@ -16,7 +16,12 @@ public:
    * Method for adding a sample value.
    * @param value the value of the sample to add
    */
-  virtual void AddSample(int64_t sample_value) PURE;
+  virtual void addValue(int64_t sample_value) PURE;
+
+  virtual uint64_t count() const PURE;
+  virtual double mean() const PURE;
+  virtual double variance() const PURE;
+  virtual double stdev() const PURE;
 };
 
-}
+} // namespace Nighthawk

@@ -8,13 +8,12 @@ package(default_visibility = ["//visibility:public"])
 envoy_cc_test(
     name = "nighthawk_test",
     srcs = [
-        "benchmark_http_client_test.cc",
-        "options_test.cc",
-        "rate_limiter_test.cc",
-        "sequencer_test.cc",
+        #"benchmark_http_client_test.cc",
+        #"options_test.cc",
+        #"rate_limiter_test.cc",
+        #"sequencer_test.cc",
         "statistic_test.cc",
-        "streaming_stats_test.cc",
-        "utility_test.cc",
+        #"utility_test.cc",
     ],
     data = [
         "certs.sh",
