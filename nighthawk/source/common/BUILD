@@ -10,6 +10,7 @@ envoy_cc_library(
     srcs = [
         "rate_limiter_impl.cc",
         "sequencer.cc",
+        "statistic_impl.cc",
         "stream_decoder.cc",
         "streaming_stats.cc",
     ],
@@ -18,6 +19,7 @@ envoy_cc_library(
         "rate_limiter_impl.h",
         "sequencer.h",
         "ssl.h",
+        "statistic_impl.h",
         "stream_decoder.h",
         "streaming_stats.h",
         "utility.h",
@@ -25,6 +27,7 @@ envoy_cc_library(
     repository = "@envoy",
     visibility = ["//visibility:public"],
     deps = [
+        "//nighthawk:hdrhistogram_c",
         "//nighthawk/include/nighthawk/client:client_includes",
         "//nighthawk/include/nighthawk/common:base_includes",
         "@envoy//source/common/common:compiler_requirements_lib",

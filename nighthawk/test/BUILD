@@ -12,6 +12,7 @@ envoy_cc_test(
         "options_test.cc",
         "rate_limiter_test.cc",
         "sequencer_test.cc",
+        "statistic_test.cc",
         "streaming_stats_test.cc",
         "utility_test.cc",
     ],
