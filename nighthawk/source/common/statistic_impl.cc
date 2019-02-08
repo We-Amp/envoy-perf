@@ -51,6 +51,7 @@ double InMemoryStatistic::stdev() const { return streaming_stats_.stdev(); }
 
 // TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
+  // Upper bound of 60 seconds (tracking in nanoseconds).
   int status = hdr_init(1, INT64_C(1000) * 1000 * 1000 * 60, 5, &histogram_);
   ASSERT(!status);
 }
