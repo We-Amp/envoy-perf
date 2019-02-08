@@ -11,4 +11,9 @@ TEST_F(StatisticTest, InMemoryStatisticTest) {
   stat.AddSample(1);
 }
 
+TEST_F(StatisticTest, HdrStatisticTest) {
+  HdrStatistic stat;
+  stat.AddSample(1);
+}
+
 } // namespace Nighthawk
