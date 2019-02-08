@@ -49,6 +49,7 @@ double InMemoryStatistic::mean() const { return streaming_stats_.mean(); }
 double InMemoryStatistic::variance() const { return streaming_stats_.variance(); }
 double InMemoryStatistic::stdev() const { return streaming_stats_.stdev(); }
 
+// TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   int status = hdr_init(1, INT64_C(1000) * 1000 * 1000 * 60, 5, &histogram_);
   ASSERT(!status);
@@ -59,6 +60,7 @@ HdrStatistic::~HdrStatistic() {
   histogram_ = nullptr;
 }
 
+// TODO(oschaaf): something more subtle then ASSERT.
 void HdrStatistic::addValue(int64_t value) { ASSERT(hdr_record_value(histogram_, value)); }
 
 uint64_t HdrStatistic::count() const { return histogram_->total_count; }
@@ -67,6 +69,28 @@ double HdrStatistic::variance() const {
   return stdev() * stdev();
   ;
 }
-double HdrStatistic::stdev() const { return hdr_stddev(histogram_); }
+double HdrStatistic::stdev() const {
+  // HdrHistogram_c's stdev actually gives us the population standard deviation.
+  // So we compute the sample standard deviation ourselves instead.
+  // TODO(oschaaf): this fixes some of the test expectations, but figure out if
+  // stdev or pstdev is preferrable. Looks like wrk2 uses pstdev which would produce
+  // (slightly) better numbers, though that probably isn't a reason for us to decice
+  // which one to use here. Switching to pstdev would get rid of having to do this
+  // ourselves.
+  double mean = hdr_mean(histogram_);
+  double geometric_dev_total = 0.0;
+
+  struct hdr_iter iter;
+  hdr_iter_init(&iter, histogram_);
+
+  while (hdr_iter_next(&iter)) {
+    if (0 != iter.count) {
+      double dev = (hdr_median_equivalent_value(histogram_, iter.value) * 1.0) - mean;
+      geometric_dev_total += (dev * dev) * iter.count;
+    }
+  }
+
+  return sqrt(geometric_dev_total / (histogram_->total_count - 1));
+}
 
 } // namespace Nighthawk

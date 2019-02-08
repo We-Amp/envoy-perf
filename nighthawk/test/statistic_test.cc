@@ -29,7 +29,7 @@ TYPED_TEST(StatisticTest, SlightlyLessSimple) {
   stat.addValue(6543456);
   stat.addValue(342335);
   EXPECT_EQ(3, stat.count());
-  EXPECT_EQ(2295675, stat.mean());
+  EXPECT_DOUBLE_EQ(2295675, stat.mean());
   EXPECT_EQ(13561820041021, stat.variance());
   EXPECT_DOUBLE_EQ(3682637.6472605884, stat.stdev());
 }
