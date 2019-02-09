@@ -48,6 +48,7 @@ uint64_t InMemoryStatistic::count() const {
 double InMemoryStatistic::mean() const { return streaming_stats_.mean(); }
 double InMemoryStatistic::variance() const { return streaming_stats_.variance(); }
 double InMemoryStatistic::stdev() const { return streaming_stats_.stdev(); }
+InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) { return b; }
 
 // TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
@@ -93,5 +94,7 @@ double HdrStatistic::stdev() const {
 
   return sqrt(geometric_dev_total / (histogram_->total_count - 1));
 }
+
+HdrStatistic HdrStatistic::combine(const HdrStatistic& b) { return b; }
 
 } // namespace Nighthawk

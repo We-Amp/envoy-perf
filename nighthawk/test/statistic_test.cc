@@ -67,7 +67,7 @@ TEST_F(StreamingStatisticTest, BasicTest) {
   EXPECT_EQ(13561820041021, b.variance());
   EXPECT_DOUBLE_EQ(3682637.6472605884, b.stdev());
 
-  StreamingStatistic c = a.combine(b);
+  auto c = a.combine(b);
   // test the numbers look like what we expect after combing.
   EXPECT_EQ(6, c.count());
   EXPECT_DOUBLE_EQ(1147838.5, c.mean());

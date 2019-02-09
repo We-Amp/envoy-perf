@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -9,7 +10,7 @@ namespace Nighthawk {
 /**
  * Abstract interface for a statistic.
  */
-class Statistic {
+template <class T> class Statistic {
 public:
   virtual ~Statistic() = default;
   /**
@@ -22,6 +23,8 @@ public:
   virtual double mean() const PURE;
   virtual double variance() const PURE;
   virtual double stdev() const PURE;
+
+  virtual T combine(const T& a) PURE;
 };
 
 } // namespace Nighthawk

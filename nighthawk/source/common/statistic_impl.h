@@ -5,11 +5,13 @@
 
 #include "nighthawk/hdrhistogram_c/src/hdr_histogram.h"
 
+#include <memory>
+
 #include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 
-class StreamingStatistic : Statistic {
+class StreamingStatistic : public Statistic<StreamingStatistic> {
 public:
   StreamingStatistic();
   void addValue(int64_t value) override;
@@ -17,8 +19,7 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-
-  StreamingStatistic combine(const StreamingStatistic& a);
+  StreamingStatistic combine(const StreamingStatistic& a) override;
 
 private:
   uint64_t count_;
@@ -26,7 +27,7 @@ private:
   double sum_of_squares_;
 };
 
-class InMemoryStatistic : Statistic {
+class InMemoryStatistic : public Statistic<InMemoryStatistic> {
 public:
   InMemoryStatistic() = default;
   void addValue(int64_t sample_value) override;
@@ -34,13 +35,14 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
+  InMemoryStatistic combine(const InMemoryStatistic& a) override;
 
 private:
   std::vector<int64_t> samples_;
   StreamingStatistic streaming_stats_;
 };
 
-class HdrStatistic : Statistic {
+class HdrStatistic : public Statistic<HdrStatistic> {
 public:
   HdrStatistic();
   virtual ~HdrStatistic() override;
@@ -49,6 +51,7 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
+  HdrStatistic combine(const HdrStatistic& a) override;
 
 private:
   struct hdr_histogram* histogram_;
