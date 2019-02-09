@@ -39,8 +39,8 @@ TYPED_TEST(StatisticTest, SlightlyLessSimple) {
 }
 
 TYPED_TEST(StatisticTest, Combine) {
-  StreamingStatistic a;
-  StreamingStatistic b;
+  TypeParam a;
+  TypeParam b;
 
   std::vector<int> a_values{1, 2, 3};
   std::vector<int> b_values{1234, 6543456, 342335};

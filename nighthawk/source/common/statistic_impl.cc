@@ -48,7 +48,14 @@ uint64_t InMemoryStatistic::count() const {
 double InMemoryStatistic::mean() const { return streaming_stats_.mean(); }
 double InMemoryStatistic::variance() const { return streaming_stats_.variance(); }
 double InMemoryStatistic::stdev() const { return streaming_stats_.stdev(); }
-InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) { return b; }
+
+InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) {
+  InMemoryStatistic combined;
+  combined.samples_.insert(combined.samples_.end(), this->samples_.begin(), this->samples_.end());
+  combined.samples_.insert(combined.samples_.end(), b.samples_.begin(), b.samples_.end());
+  combined.streaming_stats_ = this->streaming_stats_.combine(b.streaming_stats_);
+  return combined;
+}
 
 // TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
