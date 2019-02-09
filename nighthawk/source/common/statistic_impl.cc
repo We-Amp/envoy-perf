@@ -95,6 +95,11 @@ double HdrStatistic::stdev() const {
   return sqrt(geometric_dev_total / (histogram_->total_count - 1));
 }
 
-HdrStatistic HdrStatistic::combine(const HdrStatistic& b) { return b; }
+HdrStatistic HdrStatistic::combine(const HdrStatistic& b) {
+  HdrStatistic combined;
+  hdr_add(combined.histogram_, this->histogram_);
+  hdr_add(combined.histogram_, b.histogram_);
+  return combined;
+}
 
 } // namespace Nighthawk
