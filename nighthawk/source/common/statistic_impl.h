@@ -20,6 +20,7 @@ public:
   double variance() const override;
   double stdev() const override;
   StreamingStatistic combine(const StreamingStatistic& a) override;
+  std::string toString() override;
 
 private:
   uint64_t count_;
@@ -36,6 +37,7 @@ public:
   double variance() const override;
   double stdev() const override;
   InMemoryStatistic combine(const InMemoryStatistic& a) override;
+  std::string toString() override;
 
 private:
   std::vector<int64_t> samples_;
@@ -53,6 +55,7 @@ public:
   double stdev() const override;
   HdrStatistic combine(const HdrStatistic& a) override;
   virtual bool is_high_precision() override { return false; }
+  std::string toString() override;
 
 private:
   struct hdr_histogram* histogram_;

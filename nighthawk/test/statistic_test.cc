@@ -63,6 +63,7 @@ TYPED_TEST(StatisticTest, Simple) {
     EXPECT_NEAR(7005762373287.5, c.variance(), 999999999);
     EXPECT_NEAR(2646840.0732359141, c.stdev(), 99);
   }
+  c.toString();
 }
 
 } // namespace Nighthawk

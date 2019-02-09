@@ -1,6 +1,9 @@
 #include "nighthawk/source/common/statistic_impl.h"
 
 #include <cmath>
+#include <iostream>
+#include <sstream>
+#include <stdio.h>
 
 #include "common/common/assert.h"
 
@@ -36,6 +39,8 @@ StreamingStatistic StreamingStatistic::combine(const StreamingStatistic& b) {
   return combined;
 }
 
+std::string StreamingStatistic::toString() { return "StreamingStatistic"; }
+
 void InMemoryStatistic::addValue(int64_t sample_value) {
   samples_.push_back(sample_value);
   streaming_stats_.addValue(sample_value);
@@ -57,20 +62,31 @@ InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) {
   return combined;
 }
 
+std::string InMemoryStatistic::toString() { return "InMemoryStatistic"; }
+
 // TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
   int status = hdr_init(1, INT64_C(1000) * 1000 * 1000 * 60, 5, &histogram_);
-  ASSERT(!status);
+  if (status != 0) {
+    histogram_ = nullptr;
+  }
 }
 
 HdrStatistic::~HdrStatistic() {
-  hdr_close(histogram_);
-  histogram_ = nullptr;
+  if (histogram_ != nullptr) {
+    hdr_close(histogram_);
+    histogram_ = nullptr;
+  }
 }
 
-// TODO(oschaaf): something more subtle then ASSERT.
-void HdrStatistic::addValue(int64_t value) { ASSERT(hdr_record_value(histogram_, value)); }
+void HdrStatistic::addValue(int64_t value) {
+  if (histogram_ != nullptr) {
+    if (!hdr_record_value(histogram_, value)) {
+      // TODO(oschaaf): warn
+    }
+  }
+}
 
 uint64_t HdrStatistic::count() const { return histogram_->total_count; }
 double HdrStatistic::mean() const { return hdr_mean(histogram_); }
@@ -86,6 +102,9 @@ double HdrStatistic::stdev() const {
   // (slightly) better numbers, though that probably isn't a reason for us to decice
   // which one to use here. Switching to pstdev would get rid of having to do this
   // ourselves.
+  if (histogram_ == nullptr) {
+    return 0;
+  }
   double mean = hdr_mean(histogram_);
   double geometric_dev_total = 0.0;
 
@@ -104,9 +123,25 @@ double HdrStatistic::stdev() const {
 
 HdrStatistic HdrStatistic::combine(const HdrStatistic& b) {
   HdrStatistic combined;
+  if (this->histogram_ == nullptr || b.histogram_ == nullptr) {
+    return combined;
+  }
+
   hdr_add(combined.histogram_, this->histogram_);
   hdr_add(combined.histogram_, b.histogram_);
   return combined;
+}
+
+std::string HdrStatistic::toString() {
+  std::stringstream buffer;
+  std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
+  std::cout << "Bla" << std::endl;
+  std::string text = buffer.str();
+  if (histogram_ != nullptr) {
+    hdr_percentiles_print(histogram_, stdout, 5, 1.0, CLASSIC);
+  }
+  std::cout.rdbuf(old);
+  return "HdrStatistic";
 }
 
 } // namespace Nighthawk

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 
@@ -26,6 +27,7 @@ public:
 
   virtual T combine(const T& a) PURE;
   virtual bool is_high_precision() { return true; }
+  virtual std::string toString() PURE;
 };
 
 } // namespace Nighthawk
