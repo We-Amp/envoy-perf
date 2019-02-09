@@ -25,6 +25,7 @@ public:
   virtual double stdev() const PURE;
 
   virtual T combine(const T& a) PURE;
+  virtual bool is_high_precision() { return true; }
 };
 
 } // namespace Nighthawk

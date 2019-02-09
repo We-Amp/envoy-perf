@@ -52,6 +52,7 @@ public:
   double variance() const override;
   double stdev() const override;
   HdrStatistic combine(const HdrStatistic& a) override;
+  virtual bool is_high_precision() override { return false; }
 
 private:
   struct hdr_histogram* histogram_;
