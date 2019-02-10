@@ -70,12 +70,9 @@ bool Main::run() {
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<Envoy::Thread::ThreadPtr> threads;
-  std::vector<std::vector<uint64_t>> global_results;
-  std::vector<HdrStatistic> global_streaming_stats;
+  std::vector<HdrStatistic> global_statistics;
 
-  // TODO(oschaaf): Wire up a proper stats sink.
-  global_results.reserve(concurrency);
-  global_streaming_stats.resize(concurrency);
+  global_statistics.resize(concurrency);
 
   if (autoscale) {
     ENVOY_LOG(info, "Detected {} (v)CPUs with affinity..", cpu_cores_with_affinity);
@@ -92,19 +89,13 @@ bool Main::run() {
   }
 
   for (uint32_t i = 0; i < concurrency; i++) {
-    global_results.emplace_back(std::vector<uint64_t>());
-    std::vector<uint64_t>& results = global_results.at(i);
-    // TODO(oschaaf): get us a stats sink.
-
-    results.reserve(options_->duration().count() * options_->requests_per_second());
-
     // TODO(oschaaf): properly set up and use ThreadLocal::InstanceImpl.
     auto thread = thread_factory.createThread([&, i]() {
       auto store = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
       auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
                                                     *store, *time_system_);
       auto dispatcher = api->allocateDispatcher();
-      HdrStatistic& streaming_stats = global_streaming_stats[i];
+      HdrStatistic& statistics = global_statistics[i];
 
       // TODO(oschaaf): not here.
       Envoy::ThreadLocal::InstanceImpl tls;
@@ -140,12 +131,10 @@ bool Main::run() {
       Sequencer sequencer(*dispatcher, time_system, rate_limiter, f, options_->duration(),
                           options_->timeout());
 
-      sequencer.set_latency_callback(
-          [&results, &streaming_stats](std::chrono::nanoseconds latency) {
-            ASSERT(latency.count() > 0);
-            results.push_back(latency.count());
-            streaming_stats.addValue(latency.count());
-          });
+      sequencer.set_latency_callback([&statistics](std::chrono::nanoseconds latency) {
+        ASSERT(latency.count() > 0);
+        statistics.addValue(latency.count());
+      });
 
       sequencer.start();
       sequencer.waitForCompletion();
@@ -155,9 +144,8 @@ bool Main::run() {
                 "{:.{}f}μs. "
                 "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
                 "resets: {}. ",
-                i, sequencer.completions_per_second(), 2, streaming_stats.mean() / 1000, 2,
-                streaming_stats.stdev() / 1000, 2,
-                store->counter("nighthawk.upstream_cx_total").value(),
+                i, sequencer.completions_per_second(), 2, statistics.mean() / 1000, 2,
+                statistics.stdev() / 1000, 2, store->counter("nighthawk.upstream_cx_total").value(),
                 store->counter("nighthawk.upstream_cx_connect_fail").value(),
                 client->pool_overflow_failures(), client->http_good_response_count(),
                 client->http_bad_response_count(), client->stream_reset_count());
@@ -173,16 +161,16 @@ bool Main::run() {
     t->join();
   }
 
-  HdrStatistic merged_global_stats = global_streaming_stats[0];
+  HdrStatistic merged_statistics = global_statistics[0];
   for (uint32_t i = 1; i < concurrency; i++) {
-    merged_global_stats = merged_global_stats.combine(global_streaming_stats[i]);
+    merged_statistics = merged_statistics.combine(global_statistics[i]);
   }
   if (concurrency > 1) {
     ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
-              merged_global_stats.count(), merged_global_stats.mean() / 1000, 2,
-              merged_global_stats.stdev() / 1000, 2);
+              merged_statistics.count(), merged_statistics.mean() / 1000, 2,
+              merged_statistics.stdev() / 1000, 2);
   }
-  merged_global_stats.toString();
+  merged_statistics.toString();
 
   ENVOY_LOG(info, "Done.");
 
