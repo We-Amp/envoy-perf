@@ -23,8 +23,25 @@ public:
   virtual double variance() const PURE;
   virtual double stdev() const PURE;
 
+  /**
+   * Combines two Statistics into one, and returns a new, merged, Statistic.
+   * This is useful for computing results from multiple workers into a
+   * single global view.
+   * @param a The Statistic that should be combined with this instance.
+   * @return T Merged Statistic instance.
+   */
   virtual T combine(const T& a) PURE;
+
+  /**
+   * Only used in tests to match expectations to the right precision level.
+   * @return true Computed values should be considered as high precision in tests.
+   * @return false Computed values should be considered as less precise in tests.
+   */
   virtual bool is_high_precision() { return true; }
+
+  /**
+   * Dumps a representation of the statistic in plain text to stdout.
+   */
   virtual void dumpToStdOut() PURE;
 };
 
