@@ -133,14 +133,9 @@ HdrStatistic HdrStatistic::combine(const HdrStatistic& b) {
 }
 
 std::string HdrStatistic::toString() {
-  std::stringstream buffer;
-  std::streambuf* old = std::cout.rdbuf(buffer.rdbuf());
-  std::cout << "Bla" << std::endl;
-  std::string text = buffer.str();
   if (histogram_ != nullptr) {
     hdr_percentiles_print(histogram_, stdout, 5, 1.0, CLASSIC);
   }
-  std::cout.rdbuf(old);
   return "HdrStatistic";
 }
 
