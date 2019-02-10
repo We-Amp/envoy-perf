@@ -1,8 +1,6 @@
 #include "nighthawk/source/common/statistic_impl.h"
 
 #include <cmath>
-#include <iostream>
-#include <sstream>
 #include <stdio.h>
 
 #include "common/common/assert.h"
@@ -39,7 +37,7 @@ StreamingStatistic StreamingStatistic::combine(const StreamingStatistic& b) {
   return combined;
 }
 
-std::string StreamingStatistic::toString() { return "StreamingStatistic"; }
+void StreamingStatistic::dumpToStdOut() {}
 
 void InMemoryStatistic::addValue(int64_t sample_value) {
   samples_.push_back(sample_value);
@@ -62,13 +60,16 @@ InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) {
   return combined;
 }
 
-std::string InMemoryStatistic::toString() { return "InMemoryStatistic"; }
+void InMemoryStatistic::dumpToStdOut() {}
 
-// TODO(oschaaf): something more subtle then ASSERT.
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
-  int status = hdr_init(1, INT64_C(1000) * 1000 * 1000 * 60, 5, &histogram_);
+  const int64_t max_latency = 1000L * 1000 * 1000 * 60;
+
+  int status =
+      hdr_init(1 /* min trackable value */, max_latency, 3 /* significant digits */, &histogram_);
   if (status != 0) {
+    ENVOY_LOG(error, "Failed to intialize HdrHistogram.");
     histogram_ = nullptr;
   }
 }
@@ -83,7 +84,7 @@ HdrStatistic::~HdrStatistic() {
 void HdrStatistic::addValue(int64_t value) {
   if (histogram_ != nullptr) {
     if (!hdr_record_value(histogram_, value)) {
-      // TODO(oschaaf): warn
+      ENVOY_LOG(warn, "Failed to record value into HdrHistogram.");
     }
   }
 }
@@ -127,16 +128,32 @@ HdrStatistic HdrStatistic::combine(const HdrStatistic& b) {
     return combined;
   }
 
-  hdr_add(combined.histogram_, this->histogram_);
-  hdr_add(combined.histogram_, b.histogram_);
+  int dropped;
+  dropped = hdr_add(combined.histogram_, this->histogram_);
+  dropped += hdr_add(combined.histogram_, b.histogram_);
+  if (dropped > 0) {
+    ENVOY_LOG(warn, "Combining HdrHistograms dropped values.");
+  }
   return combined;
 }
 
-std::string HdrStatistic::toString() {
+void HdrStatistic::dumpToStdOut() {
   if (histogram_ != nullptr) {
-    hdr_percentiles_print(histogram_, stdout, 5, 1.0, CLASSIC);
+    ENVOY_LOG(info, "Hdr Latencies (uncorrected).");
+    ENVOY_LOG(info, "{:>12} {:>14} (us)", "Percentile", "Latency");
+
+    std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
+    for (uint64_t i = 0; i < percentiles.size(); i++) {
+      double p = percentiles[i];
+      int64_t n = hdr_value_at_percentile(histogram_, p);
+
+      // We scale from nanoseconds to microseconds in the output.
+      ENVOY_LOG(info, "{:>12}% {:>14}", p, n / 1000.0);
+    }
+
+  } else {
+    ENVOY_LOG(warn, "HdrHistogram latencies could not be printed.");
   }
-  return "HdrStatistic";
 }
 
 } // namespace Nighthawk

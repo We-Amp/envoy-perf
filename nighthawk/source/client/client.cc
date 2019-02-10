@@ -170,7 +170,7 @@ bool Main::run() {
               merged_statistics.count(), merged_statistics.mean() / 1000, 2,
               merged_statistics.stdev() / 1000, 2);
   }
-  merged_statistics.toString();
+  merged_statistics.dumpToStdOut();
 
   ENVOY_LOG(info, "Done.");
 

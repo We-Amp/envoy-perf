@@ -40,9 +40,10 @@ TYPED_TEST(StatisticTest, Simple) {
     EXPECT_DOUBLE_EQ(3682637.6472605884, b.stdev());
   } else {
     // HdrHistogram is up to 5 digits precise.
+    // We configure it to 3 (similar to wrk2).
     // Note that we repeat this test with higher precision for
     // the streaming stats below.
-    EXPECT_NEAR(2295675, b.mean(), 6);
+    EXPECT_NEAR(2295675, b.mean(), 11);
     EXPECT_NEAR(13561820041021, b.variance(), 999999999);
     EXPECT_NEAR(3682637.6472605884, b.stdev(), 99);
   }

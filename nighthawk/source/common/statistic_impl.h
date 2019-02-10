@@ -1,11 +1,10 @@
 #pragma once
 
-#include <memory>
 #include <vector>
 
 #include "nighthawk/hdrhistogram_c/src/hdr_histogram.h"
 
-#include <memory>
+#include "common/common/logger.h"
 
 #include "nighthawk/common/statistic.h"
 
@@ -20,7 +19,7 @@ public:
   double variance() const override;
   double stdev() const override;
   StreamingStatistic combine(const StreamingStatistic& a) override;
-  std::string toString() override;
+  void dumpToStdOut() override;
 
 private:
   uint64_t count_;
@@ -37,14 +36,15 @@ public:
   double variance() const override;
   double stdev() const override;
   InMemoryStatistic combine(const InMemoryStatistic& a) override;
-  std::string toString() override;
+  void dumpToStdOut() override;
 
 private:
   std::vector<int64_t> samples_;
   StreamingStatistic streaming_stats_;
 };
 
-class HdrStatistic : public Statistic<HdrStatistic> {
+class HdrStatistic : public Statistic<HdrStatistic>,
+                     public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   HdrStatistic();
   virtual ~HdrStatistic() override;
@@ -55,7 +55,7 @@ public:
   double stdev() const override;
   HdrStatistic combine(const HdrStatistic& a) override;
   virtual bool is_high_precision() override { return false; }
-  std::string toString() override;
+  void dumpToStdOut() override;
 
 private:
   struct hdr_histogram* histogram_;
