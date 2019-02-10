@@ -1,8 +1,6 @@
 #include "nighthawk/source/client/client.h"
 
 #include <chrono>
-#include <fstream>
-#include <iostream>
 #include <memory>
 #include <random>
 
@@ -73,7 +71,7 @@ bool Main::run() {
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<Envoy::Thread::ThreadPtr> threads;
   std::vector<std::vector<uint64_t>> global_results;
-  std::vector<StreamingStatistic> global_streaming_stats;
+  std::vector<HdrStatistic> global_streaming_stats;
 
   // TODO(oschaaf): Wire up a proper stats sink.
   global_results.reserve(concurrency);
@@ -106,7 +104,7 @@ bool Main::run() {
       auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
                                                     *store, *time_system_);
       auto dispatcher = api->allocateDispatcher();
-      StreamingStatistic& streaming_stats = global_streaming_stats[i];
+      HdrStatistic& streaming_stats = global_streaming_stats[i];
 
       // TODO(oschaaf): not here.
       Envoy::ThreadLocal::InstanceImpl tls;
@@ -123,11 +121,12 @@ bool Main::run() {
 
       // We try to offset the start of each thread so that workers will execute tasks evenly spaced
       // in time.
-      // TODO(oschaaf): use dispatcher to sleep.
       double rate = 1 / double(options_->requests_per_second()) / concurrency;
       int64_t spread_us = static_cast<int64_t>(rate * i * 1000000);
       ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", i, spread_us);
       if (spread_us) {
+        // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
+        // which is rather coarse for our purpose here.
         usleep(spread_us);
       }
 
@@ -174,29 +173,18 @@ bool Main::run() {
     t->join();
   }
 
+  HdrStatistic merged_global_stats = global_streaming_stats[0];
+  for (uint32_t i = 1; i < concurrency; i++) {
+    merged_global_stats = merged_global_stats.combine(global_streaming_stats[i]);
+  }
   if (concurrency > 1) {
-    StreamingStatistic merged_global_stats = global_streaming_stats[0];
-    for (uint32_t i = 1; i < concurrency; i++) {
-      merged_global_stats = merged_global_stats.combine(global_streaming_stats[i]);
-    }
     ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
               merged_global_stats.count(), merged_global_stats.mean() / 1000, 2,
               merged_global_stats.stdev() / 1000, 2);
   }
+  merged_global_stats.toString();
 
-  // TODO(oschaaf): proper stats tracking/configuration
-  std::ofstream myfile;
-  myfile.open("res.txt");
-
-  for (uint32_t i = 0; i < concurrency; i++) {
-    std::vector<uint64_t>& results = global_results.at(i);
-    for (int r : results) {
-      myfile << r << "\n";
-    }
-  }
-  myfile.close();
-
-  ENVOY_LOG(info, "Done. Run 'tools/stats.py res.txt benchmark' for hdrhistogram.");
+  ENVOY_LOG(info, "Done.");
 
   return true;
 }

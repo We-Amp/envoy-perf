@@ -14,15 +14,6 @@ HTTPS certificates are not yet validated
 
 First, follow steps 1 and 2 over at [Quick start Bazel build for developers](https://github.com/envoyproxy/envoy/blob/master/bazel/README.md#quick-start-bazel-build-for-developers).
 
-
-### Optionally (for hdrhistogram)
-
-
-```bash
-sudo apt-get install python3 python3-pip
-sudo pip3 install hdrhistogram jsonpickle
-```
-
 ## Building and testing Nighthawk
 ```bash
 # build it
