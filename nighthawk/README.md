@@ -17,10 +17,10 @@ First, follow steps 1 and 2 over at [Quick start Bazel build for developers](htt
 ## Building and testing Nighthawk
 ```bash
 # build it
-bazel build -c opt //:nighthawk_client
+bazel build -c opt //nighthawk:nighthawk_client
 
 # test it
-bazel test -c opt //test:nighthawk_test
+bazel test -c opt //nighthawk/test:nighthawk_test
 ```
 
 ## Using the Nighthawk client
@@ -101,21 +101,4 @@ $ taskset -c 0-1 nighthawk/bazel-bin/nighthawk_client --concurrency auto --rps 3
 [15:58:19.908829][032277][I] [source/client/client.cc:199] > worker 1: 29999.99/second. Mean: 25.48μs. Stdev: 3.14μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:90001/0. Stream resets: 0. 
 [15:58:19.908837][032276][I] [source/client/client.cc:199] > worker 0: 29986.44/second. Mean: 32.74μs. Stdev: 3.50μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:89961/0. Stream resets: 0. 
 [15:58:19.908973][032275][I] [source/client/client.cc:219] Global #complete:179960. Mean: 29.11μs. Stdev: 4.92μs.
-[15:58:19.928943][032275][I] [source/client/client.cc:234] Done. Run 'tools/stats.py res.txt benchmark' for hdrhistogram.
-Uncorrected hdr histogram percentiles (us)
-p50: 27
-p75: 32
-p90: 33
-p99: 42
-p99.9: 66
-p99.99: 102
-p99.999: 268
-p100: 344
-min: 21.446
-max: 344.251
-mean: 29.110338769726607
-median: 27.6875
-var: 24.221109683905244
-stdev: 4.921494659542489
-```
-
+[15:58:19.928943][032275][I] [source/client/client.cc:234] Done.
