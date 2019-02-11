@@ -18,7 +18,6 @@ envoy_cc_library(
         "benchmark_http_client.cc",
         "client.cc",
         "options_impl.cc",
-        "utility.cc",
     ],
     hdrs = [
         "benchmark_http_client.h",

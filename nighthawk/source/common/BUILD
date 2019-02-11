@@ -12,6 +12,7 @@ envoy_cc_library(
         "sequencer.cc",
         "statistic_impl.cc",
         "stream_decoder.cc",
+        "utility.cc",
     ],
     hdrs = [
         "frequency.h",
