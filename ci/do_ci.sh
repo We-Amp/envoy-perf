@@ -20,7 +20,7 @@ function do_clang_tidy() {
 }
 
 function do_coverage() {
-    bazel coverage --experimental_cc_coverage test/...  --instrumentation_filter=//nighthawk/...,. --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main --combined_report=lcov; genhtml bazel-out/_coverage/_coverage_report.dat
+    bazel coverage --experimental_cc_coverage nighthawk/test/...  --instrumentation_filter=//nighthawk/...,. --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main --combined_report=lcov; genhtml bazel-out/_coverage/_coverage_report.dat
 }
 
 # TODO(oschaaf): hack, this should be done in .circleci/config.yml
@@ -39,9 +39,11 @@ if [ -n "$CIRCLECI" ]; then
     export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=4096,2,1 --local_test_jobs=4"
 fi
 
-export PATH=/usr/lib/llvm-7/bin:$PATH
-export CC=clang
-export CXX=clang++
+if [ "$1" != "coverage" ]; then
+    export PATH=/usr/lib/llvm-7/bin:$PATH
+    export CC=clang
+    export CXX=clang++
+fi
 
 case "$1" in
     build)
