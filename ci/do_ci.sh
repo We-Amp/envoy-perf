@@ -9,6 +9,11 @@ function do_test() {
     //nighthawk/test:nighthawk_test
 }
 
+function do_test_with_valgrind() {
+    bazel build -c dbg //nighthawk/test:nighthawk_test && \
+    nighthawk/tools/valgrind-tests.sh
+}
+
 function do_clang_tidy() {
     ci/run_clang_tidy.sh
 }
@@ -40,12 +45,15 @@ case "$1" in
     test)
         do_test
     ;;
+    test_with_valgrind)
+        do_test_with_valgrind
+    ;;
     clang_tidy)
         export RUN_FULL_CLANG_TIDY=1
         do_clang_tidy
     ;;
     *)
-        echo "must be one of [build,test,clang_tidy]"
+        echo "must be one of [build,test,clang_tidy,test_with_valgrind]"
         exit 1
     ;;
 esac

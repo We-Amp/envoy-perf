@@ -25,6 +25,13 @@ jobs:
     steps:
       - checkout
       - run: ci/do_ci.sh clang_tidy
+  test_with_valgrind:
+    docker:
+      - image: *envoy-build-image
+    resource_class: xlarge
+    steps:
+      - checkout
+      - run: ci/do_ci.sh test_with_valgrind
 
 workflows:
   version: 2
@@ -33,3 +40,4 @@ workflows:
       - build
       - test
       - clang_tidy
+      - test_with_valgrind
