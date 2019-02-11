@@ -1,17 +1,17 @@
 #!/bin/bash -e
 
 function do_build () {
-    bazel build --verbose_failures=true //nighthawk:nighthawk_client
+    bazel build $BAZEL_BUILD_OPTIONS --verbose_failures=true //nighthawk:nighthawk_client
 }
 
 function do_test() {
-    bazel test --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
+    bazel test $BAZEL_BUILD_OPTIONS $BAZEL_TEST_OPTIONS --test_output=all --test_env=ENVOY_IP_TEST_VERSIONS=v4only \
     //nighthawk/test:nighthawk_test
 }
 
 function do_test_with_valgrind() {
     apt-get update && apt-get install valgrind && \
-    bazel build -c dbg //nighthawk/test:nighthawk_test && \
+    bazel build $BAZEL_BUILD_OPTIONS -c dbg //nighthawk/test:nighthawk_test && \
     nighthawk/tools/valgrind-tests.sh
 }
 
@@ -20,7 +20,7 @@ function do_clang_tidy() {
 }
 
 function do_coverage() {
-    bazel coverage --experimental_cc_coverage nighthawk/test/...  --instrumentation_filter=//nighthawk/...,. --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main --combined_report=lcov; genhtml bazel-out/_coverage/_coverage_report.dat
+    bazel coverage $BAZEL_BUILD_OPTIONS --experimental_cc_coverage nighthawk/test/...  --instrumentation_filter=//nighthawk/...,. --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main --combined_report=lcov; genhtml bazel-out/_coverage/_coverage_report.dat
 }
 
 # TODO(oschaaf): hack, this should be done in .circleci/config.yml
@@ -30,13 +30,14 @@ git submodule update --init --recursive
 # to see how this was finally resolved in Envoy's code base. There is a TODO for when
 # when a later bazel version is deployed in CI here:
 # https://github.com/lizan/envoy/blob/2eb772ac7518c8fbf2a8c7acbc1bf89e548d9c86/ci/do_ci.sh#L86
-if [ -n "$CIRCLECI" ]; then
+if [ -z "$CIRCLECI" ]; then
     if [[ -f "${HOME:-/root}/.gitconfig" ]]; then
         mv "${HOME:-/root}/.gitconfig" "${HOME:-/root}/.gitconfig_save"
         echo 1
     fi
-    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --local_resources=4096,2,1"
-    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --local_resources=4096,2,1 --local_test_jobs=4"
+    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --jobs 16"
+    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --jobs 16 --local_test_jobs=4"
+    export MAKEFLAGS="-j 16"
 fi
 
 if [ "$1" != "coverage" ]; then
