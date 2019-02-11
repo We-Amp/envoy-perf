@@ -54,8 +54,7 @@ case "$1" in
         do_test
     ;;
     test_with_valgrind)
-        #do_test_with_valgrind
-        exit 0
+        do_test_with_valgrind
     ;;
     clang_tidy)
         export RUN_FULL_CLANG_TIDY=1
