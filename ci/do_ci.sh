@@ -19,6 +19,10 @@ function do_clang_tidy() {
     ci/run_clang_tidy.sh
 }
 
+function do_coverage() {
+    bazel coverage --experimental_cc_coverage test/...  --instrumentation_filter=//nighthawk/...,. --coverage_report_generator=@bazel_tools//tools/test/CoverageOutputGenerator/java/com/google/devtools/coverageoutputgenerator:Main --combined_report=lcov; genhtml bazel-out/_coverage/_coverage_report.dat
+}
+
 # TODO(oschaaf): hack, this should be done in .circleci/config.yml
 git submodule update --init --recursive
 
@@ -53,8 +57,11 @@ case "$1" in
         export RUN_FULL_CLANG_TIDY=1
         do_clang_tidy
     ;;
+    coverage)
+        do_coverage
+    ;;
     *)
-        echo "must be one of [build,test,clang_tidy,test_with_valgrind]"
+        echo "must be one of [build,test,clang_tidy,test_with_valgrind,coverage]"
         exit 1
     ;;
 esac

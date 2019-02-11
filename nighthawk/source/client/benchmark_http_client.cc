@@ -107,7 +107,8 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
       cluster_, uri_->host_and_port(), target_address_,
       envoy::api::v2::core::Metadata::default_instance(), 1 /* weight */,
       envoy::api::v2::core::Locality(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::api::v2::core::HealthStatus::HEALTHY)};
 
   if (use_h2_) {
     pool_ = std::make_unique<Envoy::Http::Http2::ProdConnPoolImpl>(
