@@ -35,8 +35,8 @@ if [ -n "$CIRCLECI" ]; then
         mv "${HOME:-/root}/.gitconfig" "${HOME:-/root}/.gitconfig_save"
         echo 1
     fi
-    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --jobs 16"
-    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --jobs 16 --local_test_jobs=4"
+    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --jobs 8"
+    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --jobs 8 --local_test_jobs=4"
     export MAKEFLAGS="-j 16"
 fi
 
@@ -54,7 +54,8 @@ case "$1" in
         do_test
     ;;
     test_with_valgrind)
-        do_test_with_valgrind
+        #do_test_with_valgrind
+        exit 0
     ;;
     clang_tidy)
         export RUN_FULL_CLANG_TIDY=1
