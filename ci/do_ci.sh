@@ -10,6 +10,7 @@ function do_test() {
 }
 
 function do_test_with_valgrind() {
+    sudo apt-get install valgrind && \
     bazel build -c dbg //nighthawk/test:nighthawk_test && \
     nighthawk/tools/valgrind-tests.sh
 }
