@@ -16,6 +16,7 @@
 
 #include "nighthawk/source/client/benchmark_http_client.h"
 #include "nighthawk/source/client/options_impl.h"
+#include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer.h"
@@ -51,6 +52,8 @@ void Main::configureComponentLogLevels(spdlog::level::level_enum level) {
 bool Main::run() {
   // TODO(oschaaf): platform specificity need addressing.
   auto thread_factory = Envoy::Thread::ThreadFactoryImplPosix();
+  nighthawk::client::Output output;
+  output.set_allocated_options(options_->toCommandLineOptions().release());
 
   Envoy::Thread::MutexBasicLockable log_lock;
   auto logging_context = std::make_unique<Envoy::Logger::Context>(
@@ -170,8 +173,21 @@ bool Main::run() {
               merged_statistics.count(), merged_statistics.mean() / 1000, 2,
               merged_statistics.stdev() / 1000, 2);
   }
+
   merged_statistics.dumpToStdOut();
 
+  output.set_request_count(merged_statistics.count());
+  output.mutable_mean()->set_nanos(merged_statistics.mean());
+  output.mutable_stdev()->set_nanos(merged_statistics.stdev());
+
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  output.mutable_timestamp()->set_seconds(tv.tv_sec);
+  output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
+
+  std::string str;
+  google::protobuf::TextFormat::PrintToString(output, &str);
+  ENVOY_LOG(info, "protoc output:\n{}", str);
   ENVOY_LOG(info, "Done.");
 
   return true;
