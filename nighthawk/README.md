@@ -88,7 +88,7 @@ Where:
 
 ## Sample benchmark run
 
-```zsh
+```bash
 # start the benchmark target (Envoy in this case) on core 3.
 $ taskset -c 3 /path/to/envoy --config-path nighthawk/tools/envoy.yaml
 
@@ -113,3 +113,25 @@ $ nighthawk taskset -c 0-1 bazel-bin/nighthawk/nighthawk_client --duration 5 --r
 [09:37:17.986257][23146][I] [nighthawk/source/common/statistic_impl.cc:151]          100%        426.751
 [09:37:17.987423][23146][I] [nighthawk/source/client/client.cc:202] Done. Wrote measurements/1549960637987376677.json.
 ```
+
+## Accuracy and repeatability considerations when using the Nighthawk client [WIP]
+
+- Processes not related to the benchmmarking task at hand may add significant noise. Consider stopping any
+  processes that are not needed. 
+- Be aware that CPU Frequency changes are able to introduce significant noise. 
+  Nighthawk uses a busy loop, which helps minimize this.
+- Be aware that CPU Thermal throttling may skew results.
+- Consider using taskset to isolate client and server.
+- Consider disabling hyperthreading.
+- Tuning the OS for latency
+  - Tuning the system manually, or with tuned.
+  - TODO(oschaaf): link resources.
+- When using Nighthawk with concurrency > 1, workers may produce significantly different results for various reasons:
+  - Connections may end up being serviced by the same server thread, or not.
+  - One of the clients may be unlucky and spend time waiting on requests from the other(s)
+    being serviced.
+  - Nighthawk makes an effort to delay the start of each worker so that from a global perspective
+    requests will end up evenly spaced in time. This step isn't very sophisticated at the moment, 
+    and any noise during this step may cause interference by introducing batching/queueing effects.
+  
+  
