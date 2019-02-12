@@ -29,6 +29,7 @@ envoy_cc_library(
         "//nighthawk:hdrhistogram_c",
         "//nighthawk/include/nighthawk/client:client_includes",
         "//nighthawk/include/nighthawk/common:base_includes",
+        "//nighthawk/source/client:benchmark_options_cc",
         "@envoy//source/common/common:compiler_requirements_lib",
         "@envoy//source/common/common:thread_impl_lib_posix",
         "@envoy//source/common/stats:stats_lib",

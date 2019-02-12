@@ -156,4 +156,20 @@ void HdrStatistic::dumpToStdOut() {
   }
 }
 
+void HdrStatistic::percentilesToProto(nighthawk::client::Output& output) {
+  struct hdr_iter iter;
+  struct hdr_iter_percentiles* percentiles;
+  hdr_iter_percentile_init(&iter, histogram_, 5 /*ticks_per_half_distance*/);
+
+  percentiles = &iter.specifics.percentiles;
+  while (hdr_iter_next(&iter)) {
+    auto percentile = output.add_percentiles();
+
+    percentile->mutable_latency()->set_nanos(iter.highest_equivalent_value);
+    percentile->set_percentile(percentiles->percentile / 100.0);
+    percentile->set_count(iter.cumulative_count);
+    percentile->set_inverted_percentile(1.0 / (1.0 - (percentiles->percentile / 100.0)));
+  }
+}
+
 } // namespace Nighthawk

@@ -7,6 +7,7 @@
 #include "common/common/logger.h"
 
 #include "nighthawk/common/statistic.h"
+#include "nighthawk/source/client/output.pb.h"
 
 namespace Nighthawk {
 
@@ -56,6 +57,7 @@ public:
   HdrStatistic combine(const HdrStatistic& a) override;
   virtual bool is_high_precision() override { return false; }
   void dumpToStdOut() override;
+  void percentilesToProto(nighthawk::client::Output& output);
 
 private:
   struct hdr_histogram* histogram_;

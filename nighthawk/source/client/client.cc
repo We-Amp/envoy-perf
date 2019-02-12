@@ -173,7 +173,6 @@ bool Main::run() {
               merged_statistics.count(), merged_statistics.mean() / 1000, 2,
               merged_statistics.stdev() / 1000, 2);
   }
-
   merged_statistics.dumpToStdOut();
 
   output.set_request_count(merged_statistics.count());
@@ -184,6 +183,7 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
+  merged_statistics.percentilesToProto(output);
 
   std::string str;
   google::protobuf::TextFormat::PrintToString(output, &str);
