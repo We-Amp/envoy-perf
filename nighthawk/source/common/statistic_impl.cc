@@ -71,7 +71,7 @@ HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   const int64_t max_latency = 1000L * 1000 * 1000 * 60;
 
   int status =
-      hdr_init(1 /* min trackable value */, max_latency, 3 /* significant digits */, &histogram_);
+      hdr_init(1 /* min trackable value */, max_latency, 4 /* significant digits */, &histogram_);
   if (status != 0) {
     ENVOY_LOG(error, "Failed to intialize HdrHistogram.");
     histogram_ = nullptr;
@@ -149,7 +149,7 @@ std::unique_ptr<HdrStatistic> HdrStatistic::getCorrected(Frequency frequency) {
   }
   int dropped = hdr_add_while_correcting_for_coordinated_omission(
       h->histogram_, this->histogram_,
-      std::chrono::duration_cast<std::chrono::microseconds>(frequency.interval()).count());
+      std::chrono::duration_cast<std::chrono::nanoseconds>(frequency.interval()).count());
   if (dropped > 0) {
     ENVOY_LOG(warn, "Dropped values while getting the corrected HdrStatistics.");
   }
