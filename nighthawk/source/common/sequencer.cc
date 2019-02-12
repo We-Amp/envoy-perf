@@ -68,16 +68,15 @@ void Sequencer::run(bool from_timer) {
 
   while (rate_limiter_.tryAcquireOne()) {
     bool ok = target_([this, now]() {
-      if (latency_callback_ != nullptr) {
-        auto dur = time_source_.monotonicTime() - now;
-        latency_callback_(dur);
-      }
+      auto dur = time_source_.monotonicTime() - now;
+      latency_statistic_.addValue(dur.count());
       targets_completed_++;
       incidental_timer_->enableTimer(0ms);
     });
     if (ok) {
       targets_initiated_++;
     } else {
+      // TODO(oschaaf): this is where we run into coordinated omission.
       rate_limiter_.releaseOne();
       break;
     }
