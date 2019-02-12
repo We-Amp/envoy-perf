@@ -4,3 +4,4 @@ bazel-*
 res.txt
 compile_commands.json
 .bazelrc
+measurements/

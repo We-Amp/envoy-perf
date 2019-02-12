@@ -1,10 +1,14 @@
 #include "nighthawk/source/client/client.h"
 
 #include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <random>
 
 #include "ares.h"
+#include <google/protobuf/util/json_util.h>
 
 #include "common/api/api_impl.h"
 #include "common/common/compiler_requirements.h"
@@ -186,9 +190,16 @@ bool Main::run() {
   merged_statistics.percentilesToProto(output);
 
   std::string str;
-  google::protobuf::TextFormat::PrintToString(output, &str);
-  ENVOY_LOG(info, "protoc output:\n{}", str);
-  ENVOY_LOG(info, "Done.");
+  google::protobuf::util::JsonPrintOptions options;
+  google::protobuf::util::MessageToJsonString(output, &str, options);
+
+  mkdir("measurements", 0777);
+  std::ofstream stream;
+  int64_t epoch_seconds = std::chrono::system_clock::now().time_since_epoch().count();
+  std::string filename = fmt::format("measurements/{}.json", epoch_seconds);
+  stream.open(filename);
+  stream << str;
+  ENVOY_LOG(info, "Done. Wrote {}.", filename);
 
   return true;
 }
