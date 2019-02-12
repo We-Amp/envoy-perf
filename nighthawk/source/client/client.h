@@ -17,7 +17,6 @@ public:
   Main(int argc, const char* const* argv);
   Main(Client::OptionsPtr&& options);
   ~Main();
-
   bool run();
 
 private:
@@ -25,7 +24,6 @@ private:
   std::unique_ptr<Envoy::Event::TimeSystem> time_system_;
   std::unique_ptr<Envoy::Logger::Context> logging_context_;
   Envoy::Network::Address::InstanceConstSharedPtr target_address_;
-  WorkerPtr worker_;
   void configureComponentLogLevels(spdlog::level::level_enum level);
 };
 

@@ -33,22 +33,30 @@ namespace Client {
 
 class WorkerContext : Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  WorkerContext(Envoy::Thread::ThreadFactoryImplPosix& thread_factory,
-                Envoy::ThreadLocal::InstanceImpl& tls, Options& options, int worker_number)
-      : store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
-        api_(std::make_unique<Envoy::Api::Impl>(1000ms, thread_factory, *store_, time_system_)),
-        dispatcher_(api_->allocateDispatcher()),
-        runtime_(Envoy::Runtime::LoaderImpl(generator_, *store_, tls)),
-        worker_number_(worker_number), options_(options) {
-    tls.registerThread(*dispatcher_, false);
-    // auto foo = tls.allocateSlot();
+  WorkerContext(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
+                int worker_number)
+      : thread_factory_(thread_factory), worker_number_(worker_number), options_(options) {
+    // tls_.registerThread(*dispatcher_, false);
     thread_ = thread_factory.createThread([this]() { work(); });
   }
 
   void work() {
-    client_ = std::make_unique<BenchmarkHttpClient>(
+    Envoy::Event::RealTimeSystem time_system_;
+    auto store_ = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
+    auto api_ = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory_,
+                                                   *store_, time_system_);
+    auto dispatcher_ = api_->allocateDispatcher();
+    // HdrStatistic* statistics = global_statistics[i].get();
+
+    // TODO(oschaaf): not here.
+    Envoy::ThreadLocal::InstanceImpl tls_;
+    Envoy::Runtime::RandomGeneratorImpl generator_;
+    Envoy::Runtime::LoaderImpl runtime_(generator_, *store_, tls_);
+
+    auto client_ = std::make_unique<BenchmarkHttpClient>(
         *dispatcher_, *store_, time_system_, options_.uri(),
         std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
+
     client_->set_connection_timeout(options_.timeout());
     client_->set_connection_limit(options_.connections());
     client_->initialize(runtime_);
@@ -65,7 +73,7 @@ public:
     }
 
     // one to warm up.
-    client_->tryStartOne([this] { dispatcher_->exit(); });
+    client_->tryStartOne([&dispatcher_] { dispatcher_->exit(); });
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
     LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
@@ -88,22 +96,17 @@ public:
               client_->pool_overflow_failures(), client_->http_good_response_count(),
               client_->http_bad_response_count(), client_->stream_reset_count());
     client_.reset();
+    // TODO(oschaaf): shouldn't be doing this here.
+    tls_.shutdownGlobalThreading();
   }
 
   void waitForCompletion() { thread_->join(); }
 
 private:
+  Envoy::Thread::ThreadFactoryImplPosix& thread_factory_;
   Envoy::Thread::ThreadPtr thread_;
-  Envoy::Event::RealTimeSystem time_system_;
-  std::unique_ptr<Envoy::Stats::IsolatedStoreImpl> store_;
-  std::unique_ptr<Envoy::Api::Impl> api_;
-  Envoy::Event::DispatcherPtr dispatcher_;
-  Envoy::Runtime::RandomGeneratorImpl generator_;
-  Envoy::Runtime::LoaderImpl runtime_;
-  std::unique_ptr<BenchmarkHttpClient> client_;
   int worker_number_;
   Options& options_;
-  Envoy::ThreadLocal::SlotPtr slot_;
 };
 
 Main::Main(int argc, const char* const* argv)
@@ -171,15 +174,12 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
-  Envoy::ThreadLocal::InstanceImpl tls;
   for (uint32_t i = 0; i < concurrency; i++) {
-    worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, tls, *options_, i));
+    worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, *options_, i));
   }
   for (auto& w : worker_contexts) {
     w->waitForCompletion();
   }
-  // TODO(oschaaf): shouldn't be doing this here.
-  tls.shutdownGlobalThreading();
   auto merged_statistics = std::make_unique<HdrStatistic>();
   for (uint32_t i = 0; i < concurrency; i++) {
     merged_statistics = merged_statistics->combine(*global_statistics[i]);
@@ -190,7 +190,6 @@ bool Main::run() {
               merged_statistics->stdev() / 1000, 2);
   }
   merged_statistics->dumpToStdOut("Uncorrected latencies");
-
   auto corrected = merged_statistics->getCorrected(Frequency(options_->requests_per_second()));
   corrected->dumpToStdOut("Corrected latencies");
 
@@ -207,7 +206,7 @@ bool Main::run() {
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;
-  google::protobuf::util::MessageToJsonString(output, &str, options);
+  // google::protobuf::util::MessageToJsonString(output, &str, options);
 
   mkdir("measurements", 0777);
   std::ofstream stream;
