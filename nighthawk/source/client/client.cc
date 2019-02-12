@@ -40,17 +40,19 @@ public:
         dispatcher_(api_->allocateDispatcher()),
         runtime_(Envoy::Runtime::LoaderImpl(generator_, *store_, tls)),
         worker_number_(worker_number), options_(options) {
-    client_ = std::make_unique<BenchmarkHttpClient>(
-        *dispatcher_, *store_, time_system_, options.uri(),
-        std::make_unique<Envoy::Http::HeaderMapImpl>(), options.h2());
-    client_->set_connection_timeout(options.timeout());
-    client_->set_connection_limit(options.connections());
-    client_->initialize(runtime_);
     tls.registerThread(*dispatcher_, false);
+    // auto foo = tls.allocateSlot();
     thread_ = thread_factory.createThread([this]() { work(); });
   }
 
   void work() {
+    client_ = std::make_unique<BenchmarkHttpClient>(
+        *dispatcher_, *store_, time_system_, options_.uri(),
+        std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
+    client_->set_connection_timeout(options_.timeout());
+    client_->set_connection_limit(options_.connections());
+    client_->initialize(runtime_);
+
     // We try to offset the start of each thread so that workers will execute tasks evenly spaced
     // in time.
     double rate = 1 / double(options_.requests_per_second()) / worker_number_;
@@ -172,9 +174,6 @@ bool Main::run() {
   Envoy::ThreadLocal::InstanceImpl tls;
   for (uint32_t i = 0; i < concurrency; i++) {
     worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, tls, *options_, i));
-  }
-  for (auto& w : worker_contexts) {
-    w->work();
   }
   for (auto& w : worker_contexts) {
     w->waitForCompletion();
