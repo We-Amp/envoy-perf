@@ -114,24 +114,35 @@ $ nighthawk taskset -c 0-1 bazel-bin/nighthawk/nighthawk_client --duration 5 --r
 [09:37:17.987423][23146][I] [nighthawk/source/client/client.cc:202] Done. Wrote measurements/1549960637987376677.json.
 ```
 
-## Accuracy and repeatability considerations when using the Nighthawk client [WIP]
+Nighthawk will create a directory called `measurement/` and log results in json format there.
+The name of the file will be `<epoch.json>`, which contains:
 
-- Processes not related to the benchmmarking task at hand may add significant noise. Consider stopping any
+- The start time of the test, and a serialization of the Nighthawk options involved.
+- The mean latency and the observed standard deviation.
+- Latency percentiles produced by HdrHistogram.
+
+## Accuracy and repeatability considerations when using the Nighthawk client.
+
+- Processes not related to the benchmarking task at hand may add significant noise. Consider stopping any
   processes that are not needed. 
-- Be aware that CPU Frequency changes are able to introduce significant noise. 
-  Nighthawk uses a busy loop, which helps minimize this.
+- Be aware that power state management and CPU Frequency changes are able to introduce significant noise.
+  When idle, Nighthawk uses a busy loop to achieve precise timings when starting requests, which helps minimize this.
+  Still, consider disabling c-state changes in the system BIOS.
 - Be aware that CPU Thermal throttling may skew results.
-- Consider using taskset to isolate client and server.
-- Consider disabling hyperthreading.
-- Tuning the OS for latency
+- Consider using `taskset` to isolate client and server. On machines with multiple physical CPU's there is a choice here.
+  You can partition client and server on the same physical processor, or run each of them on a different physical CPU.
+- Consider disabling hyper-threading.
+- Consider tuning the benchmarking system for low latency
   - Tuning the system manually, or with tuned.
   - TODO(oschaaf): link resources.
-- When using Nighthawk with concurrency > 1, workers may produce significantly different results for various reasons:
-  - Connections may end up being serviced by the same server thread, or not.
+- When using Nighthawk with concurrency > 1 or multiple connections, workers may produce significantly different
+  results for various reasons:
+  - Server fairness. For example, connections may end up being serviced by the same server thread, or not.
   - One of the clients may be unlucky and spend time waiting on requests from the other(s)
     being serviced.
   - Nighthawk makes an effort to delay the start of each worker so that from a global perspective
-    requests will end up evenly spaced in time. This step isn't very sophisticated at the moment, 
-    and any noise during this step may cause interference by introducing batching/queueing effects.
+    requests will end up evenly spaced in time. This step isn't very sophisticated at the moment,
+    and any noise during this step may cause irregularities in request timings.
+- Finally, consider using two machines to completely isolate client and server.
   
   
