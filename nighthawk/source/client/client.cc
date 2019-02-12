@@ -76,9 +76,11 @@ bool Main::run() {
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<Envoy::Thread::ThreadPtr> threads;
-  std::vector<HdrStatistic> global_statistics;
+  std::vector<std::unique_ptr<HdrStatistic>> global_statistics;
 
-  global_statistics.resize(concurrency);
+  for (uint32_t i = 0; i < concurrency; i++) {
+    global_statistics.push_back(std::make_unique<HdrStatistic>());
+  }
 
   if (autoscale) {
     ENVOY_LOG(info, "Detected {} (v)CPUs with affinity..", cpu_cores_with_affinity);
@@ -101,7 +103,7 @@ bool Main::run() {
       auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
                                                     *store, *time_system_);
       auto dispatcher = api->allocateDispatcher();
-      HdrStatistic& statistics = global_statistics[i];
+      HdrStatistic* statistics = global_statistics[i].get();
 
       // TODO(oschaaf): not here.
       Envoy::ThreadLocal::InstanceImpl tls;
@@ -137,9 +139,9 @@ bool Main::run() {
       Sequencer sequencer(*dispatcher, time_system, rate_limiter, f, options_->duration(),
                           options_->timeout());
 
-      sequencer.set_latency_callback([&statistics](std::chrono::nanoseconds latency) {
+      sequencer.set_latency_callback([statistics](std::chrono::nanoseconds latency) {
         ASSERT(latency.count() > 0);
-        statistics.addValue(latency.count());
+        statistics->addValue(latency.count());
       });
 
       sequencer.start();
@@ -150,8 +152,9 @@ bool Main::run() {
                 "{:.{}f}μs. "
                 "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
                 "resets: {}. ",
-                i, sequencer.completions_per_second(), 2, statistics.mean() / 1000, 2,
-                statistics.stdev() / 1000, 2, store->counter("nighthawk.upstream_cx_total").value(),
+                i, sequencer.completions_per_second(), 2, statistics->mean() / 1000, 2,
+                statistics->stdev() / 1000, 2,
+                store->counter("nighthawk.upstream_cx_total").value(),
                 store->counter("nighthawk.upstream_cx_connect_fail").value(),
                 client->pool_overflow_failures(), client->http_good_response_count(),
                 client->http_bad_response_count(), client->stream_reset_count());
@@ -167,26 +170,28 @@ bool Main::run() {
     t->join();
   }
 
-  HdrStatistic merged_statistics = global_statistics[0];
-  for (uint32_t i = 1; i < concurrency; i++) {
-    merged_statistics = merged_statistics.combine(global_statistics[i]);
+  auto merged_statistics = std::make_unique<HdrStatistic>();
+  for (uint32_t i = 0; i < concurrency; i++) {
+    merged_statistics = merged_statistics->combine(*global_statistics[i]);
   }
   if (concurrency > 1) {
     ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
-              merged_statistics.count(), merged_statistics.mean() / 1000, 2,
-              merged_statistics.stdev() / 1000, 2);
+              merged_statistics->count(), merged_statistics->mean() / 1000, 2,
+              merged_statistics->stdev() / 1000, 2);
   }
-  merged_statistics.dumpToStdOut();
+  merged_statistics->dumpToStdOut();
+  auto corrected = merged_statistics->getCorrected(Frequency(options_->requests_per_second()));
+  corrected->dumpToStdOut();
 
-  output.set_request_count(merged_statistics.count());
-  output.mutable_mean()->set_nanos(merged_statistics.mean());
-  output.mutable_stdev()->set_nanos(merged_statistics.stdev());
+  output.set_request_count(merged_statistics->count());
+  output.mutable_mean()->set_nanos(merged_statistics->mean());
+  output.mutable_stdev()->set_nanos(merged_statistics->stdev());
 
   struct timeval tv;
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  merged_statistics.percentilesToProto(output);
+  merged_statistics->percentilesToProto(output);
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

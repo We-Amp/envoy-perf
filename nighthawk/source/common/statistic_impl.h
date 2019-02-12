@@ -1,13 +1,16 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "nighthawk/hdrhistogram_c/src/hdr_histogram.h"
 
 #include "common/common/logger.h"
+#include "common/common/non_copyable.h"
 
 #include "nighthawk/common/statistic.h"
 #include "nighthawk/source/client/output.pb.h"
+#include "nighthawk/source/common/frequency.h"
 
 namespace Nighthawk {
 
@@ -19,7 +22,7 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-  StreamingStatistic combine(const StreamingStatistic& a) override;
+  std::unique_ptr<StreamingStatistic> combine(const StreamingStatistic& a) override;
   void dumpToStdOut() override;
 
 private:
@@ -36,15 +39,16 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-  InMemoryStatistic combine(const InMemoryStatistic& a) override;
+  std::unique_ptr<InMemoryStatistic> combine(const InMemoryStatistic& a) override;
   void dumpToStdOut() override;
 
 private:
   std::vector<int64_t> samples_;
-  StreamingStatistic streaming_stats_;
+  std::unique_ptr<StreamingStatistic> streaming_stats_;
 };
 
 class HdrStatistic : public Statistic<HdrStatistic>,
+                     Envoy::NonCopyable,
                      public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   HdrStatistic();
@@ -54,7 +58,8 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-  HdrStatistic combine(const HdrStatistic& a) override;
+  std::unique_ptr<HdrStatistic> combine(const HdrStatistic& a) override;
+  std::unique_ptr<HdrStatistic> getCorrected(Frequency frequency);
   virtual bool is_high_precision() override { return false; }
   void dumpToStdOut() override;
   void percentilesToProto(nighthawk::client::Output& output);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
 #include "envoy/common/pure.h"
 
@@ -30,7 +31,7 @@ public:
    * @param a The Statistic that should be combined with this instance.
    * @return T Merged Statistic instance.
    */
-  virtual T combine(const T& a) PURE;
+  virtual std::unique_ptr<T> combine(const T& a) PURE;
 
   /**
    * Only used in tests to match expectations to the right precision level.

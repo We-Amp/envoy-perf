@@ -26,14 +26,15 @@ double StreamingStatistic::variance() const { return sum_of_squares_ / (count_ -
 
 double StreamingStatistic::stdev() const { return sqrt(variance()); }
 
-StreamingStatistic StreamingStatistic::combine(const StreamingStatistic& b) {
+std::unique_ptr<StreamingStatistic> StreamingStatistic::combine(const StreamingStatistic& b) {
   const StreamingStatistic& a = *this;
-  StreamingStatistic combined;
+  auto combined = std::make_unique<StreamingStatistic>();
 
-  combined.count_ = a.count() + b.count();
-  combined.mean_ = ((a.count() * a.mean()) + (b.count() * b.mean())) / combined.count_;
-  combined.sum_of_squares_ = a.sum_of_squares_ + b.sum_of_squares_ +
-                             pow(a.mean() - b.mean(), 2) * a.count() * b.count() / combined.count();
+  combined->count_ = a.count() + b.count();
+  combined->mean_ = ((a.count() * a.mean()) + (b.count() * b.mean())) / combined->count_;
+  combined->sum_of_squares_ =
+      a.sum_of_squares_ + b.sum_of_squares_ +
+      pow(a.mean() - b.mean(), 2) * a.count() * b.count() / combined->count();
   return combined;
 }
 
@@ -41,22 +42,23 @@ void StreamingStatistic::dumpToStdOut() {}
 
 void InMemoryStatistic::addValue(int64_t sample_value) {
   samples_.push_back(sample_value);
-  streaming_stats_.addValue(sample_value);
+  streaming_stats_->addValue(sample_value);
 }
 
 uint64_t InMemoryStatistic::count() const {
-  ASSERT(streaming_stats_.count() == samples_.size());
-  return streaming_stats_.count();
+  ASSERT(streaming_stats_->count() == samples_.size());
+  return streaming_stats_->count();
 }
-double InMemoryStatistic::mean() const { return streaming_stats_.mean(); }
-double InMemoryStatistic::variance() const { return streaming_stats_.variance(); }
-double InMemoryStatistic::stdev() const { return streaming_stats_.stdev(); }
+double InMemoryStatistic::mean() const { return streaming_stats_->mean(); }
+double InMemoryStatistic::variance() const { return streaming_stats_->variance(); }
+double InMemoryStatistic::stdev() const { return streaming_stats_->stdev(); }
 
-InMemoryStatistic InMemoryStatistic::combine(const InMemoryStatistic& b) {
-  InMemoryStatistic combined;
-  combined.samples_.insert(combined.samples_.end(), this->samples_.begin(), this->samples_.end());
-  combined.samples_.insert(combined.samples_.end(), b.samples_.begin(), b.samples_.end());
-  combined.streaming_stats_ = this->streaming_stats_.combine(b.streaming_stats_);
+std::unique_ptr<InMemoryStatistic> InMemoryStatistic::combine(const InMemoryStatistic& b) {
+  auto combined = std::make_unique<InMemoryStatistic>();
+
+  combined->samples_.insert(combined->samples_.end(), this->samples_.begin(), this->samples_.end());
+  combined->samples_.insert(combined->samples_.end(), b.samples_.begin(), b.samples_.end());
+  combined->streaming_stats_ = this->streaming_stats_->combine(*b.streaming_stats_);
   return combined;
 }
 
@@ -122,37 +124,51 @@ double HdrStatistic::stdev() const {
   return sqrt(geometric_dev_total / (histogram_->total_count - 1));
 }
 
-HdrStatistic HdrStatistic::combine(const HdrStatistic& b) {
-  HdrStatistic combined;
+std::unique_ptr<HdrStatistic> HdrStatistic::combine(const HdrStatistic& b) {
+  auto combined = std::make_unique<HdrStatistic>();
+
   if (this->histogram_ == nullptr || b.histogram_ == nullptr) {
     return combined;
   }
 
   int dropped;
-  dropped = hdr_add(combined.histogram_, this->histogram_);
-  dropped += hdr_add(combined.histogram_, b.histogram_);
+  dropped = hdr_add(combined->histogram_, this->histogram_);
+  dropped += hdr_add(combined->histogram_, b.histogram_);
   if (dropped > 0) {
     ENVOY_LOG(warn, "Combining HdrHistograms dropped values.");
   }
   return combined;
 }
 
+std::unique_ptr<HdrStatistic> HdrStatistic::getCorrected(Frequency frequency) {
+  auto h = std::make_unique<HdrStatistic>();
+  if (this->histogram_ == nullptr) {
+    return h;
+  }
+  int dropped = hdr_add_while_correcting_for_coordinated_omission(
+      h->histogram_, this->histogram_,
+      std::chrono::duration_cast<std::chrono::nanoseconds>(frequency.interval()).count());
+  if (dropped > 0) {
+    ENVOY_LOG(warn, "Dropped values while getting the corrected HdrStatistics.");
+  }
+  return h;
+}
+
 void HdrStatistic::dumpToStdOut() {
-  if (histogram_ != nullptr) {
-    ENVOY_LOG(info, "Hdr Latencies (uncorrected).");
-    ENVOY_LOG(info, "{:>12} {:>14} (us)", "Percentile", "Latency");
-
-    std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
-    for (uint64_t i = 0; i < percentiles.size(); i++) {
-      double p = percentiles[i];
-      int64_t n = hdr_value_at_percentile(histogram_, p);
-
-      // We scale from nanoseconds to microseconds in the output.
-      ENVOY_LOG(info, "{:>12}% {:>14}", p, n / 1000.0);
-    }
-
-  } else {
+  if (histogram_ == nullptr) {
     ENVOY_LOG(warn, "HdrHistogram latencies could not be printed.");
+    return;
+  }
+  ENVOY_LOG(info, "Hdr Latencies (uncorrected).");
+  ENVOY_LOG(info, "{:>12} {:>14} (us)", "Percentile", "Latency");
+
+  std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
+  for (uint64_t i = 0; i < percentiles.size(); i++) {
+    double p = percentiles[i];
+    int64_t n = hdr_value_at_percentile(histogram_, p);
+
+    // We scale from nanoseconds to microseconds in the output.
+    ENVOY_LOG(info, "{:>12}% {:>14}", p, n / 1000.0);
   }
 }
 
@@ -163,7 +179,8 @@ void HdrStatistic::percentilesToProto(nighthawk::client::Output& output) {
 
   percentiles = &iter.specifics.percentiles;
   while (hdr_iter_next(&iter)) {
-    auto percentile = output.add_percentiles();
+    continue;
+    nighthawk::client::Percentile* percentile = output.add_percentiles();
 
     percentile->mutable_latency()->set_nanos(iter.highest_equivalent_value);
     percentile->set_percentile(percentiles->percentile / 100.0);
