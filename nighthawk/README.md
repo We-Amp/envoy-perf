@@ -92,13 +92,24 @@ Where:
 # start the benchmark target (Envoy in this case) on core 3.
 $ taskset -c 3 /path/to/envoy --config-path nighthawk/tools/envoy.yaml
 
-# run the benchmark on cores 0 and 1
-$ taskset -c 0-1 nighthawk/bazel-bin/nighthawk_client --concurrency auto --rps 30000 --connections 1 --duration 3 http://127.0.0.1:10000/ && tools/stats.py res.txt benchmark
-[15:58:16.907520][032275][I] [source/client/client.cc:110] Detected 2 (v)CPUs with affinity..
-[15:58:16.907555][032275][I] [source/client/client.cc:114] Starting 2 threads / event loops. Test duration: 3 seconds.
-[15:58:16.907558][032275][I] [source/client/client.cc:116] Global targets: 2 connections and 60000 calls per second.
-[15:58:16.907559][032275][I] [source/client/client.cc:120]    (Per-worker targets: 1 connections and 30000 calls per second)
-[15:58:19.908829][032277][I] [source/client/client.cc:199] > worker 1: 29999.99/second. Mean: 25.48μs. Stdev: 3.14μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:90001/0. Stream resets: 0. 
-[15:58:19.908837][032276][I] [source/client/client.cc:199] > worker 0: 29986.44/second. Mean: 32.74μs. Stdev: 3.50μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:89961/0. Stream resets: 0. 
-[15:58:19.908973][032275][I] [source/client/client.cc:219] Global #complete:179960. Mean: 29.11μs. Stdev: 4.92μs.
-[15:58:19.928943][032275][I] [source/client/client.cc:234] Done.
+# run a benchmark on cores 0 and 1
+$ nighthawk taskset -c 0-1 bazel-bin/nighthawk/nighthawk_client --duration 5 --rps 20000 --concurrency auto http://127.0.0.1:10000/
+[09:37:12.960525][23146][I] [nighthawk/source/client/client.cc:85] Detected 2 (v)CPUs with affinity..
+[09:37:12.960571][23146][I] [nighthawk/source/client/client.cc:89] Starting 2 threads / event loops. Test duration: 5 seconds.
+[09:37:12.960573][23146][I] [nighthawk/source/client/client.cc:91] Global targets: 2 connections and 40000 calls per second.
+[09:37:12.960575][23146][I] [nighthawk/source/client/client.cc:95]    (Per-worker targets: 1 connections and 20000 calls per second)
+[09:37:17.984787][23147][I] [nighthawk/source/client/client.cc:158] > worker 0: 19999.89/second. Mean: 28.37μs. Stdev: 6.22μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:100001/0. Stream resets: 0. 
+[09:37:17.984839][23148][I] [nighthawk/source/client/client.cc:158] > worker 1: 19999.88/second. Mean: 30.95μs. Stdev: 5.52μs. Connections good/bad/overflow: 1/0/0. Replies: good/fail:100001/0. Stream resets: 0. 
+[09:37:17.985595][23146][I] [nighthawk/source/client/client.cc:178] Global #complete:200000. Mean: 29.66μs. Stdev: 6.02μs.
+[09:37:17.985601][23146][I] [nighthawk/source/common/statistic_impl.cc:142] Hdr Latencies (uncorrected).
+[09:37:17.985603][23146][I] [nighthawk/source/common/statistic_impl.cc:143]   Percentile        Latency (us)
+[09:37:17.985644][23146][I] [nighthawk/source/common/statistic_impl.cc:151]           50%         29.791
+[09:37:17.985720][23146][I] [nighthawk/source/common/statistic_impl.cc:151]           75%         30.223
+[09:37:17.985761][23146][I] [nighthawk/source/common/statistic_impl.cc:151]           90%         30.943
+[09:37:17.985840][23146][I] [nighthawk/source/common/statistic_impl.cc:151]           99%         55.263
+[09:37:17.985911][23146][I] [nighthawk/source/common/statistic_impl.cc:151]         99.9%         90.111
+[09:37:17.986055][23146][I] [nighthawk/source/common/statistic_impl.cc:151]        99.99%        176.383
+[09:37:17.986156][23146][I] [nighthawk/source/common/statistic_impl.cc:151]       99.999%        380.671
+[09:37:17.986257][23146][I] [nighthawk/source/common/statistic_impl.cc:151]          100%        426.751
+[09:37:17.987423][23146][I] [nighthawk/source/client/client.cc:202] Done. Wrote measurements/1549960637987376677.json.
+```
