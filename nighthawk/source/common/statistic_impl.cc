@@ -38,7 +38,9 @@ std::unique_ptr<StreamingStatistic> StreamingStatistic::combine(const StreamingS
   return combined;
 }
 
-void StreamingStatistic::dumpToStdOut() {}
+void StreamingStatistic::dumpToStdOut(std::string header) { ENVOY_LOG(info, "{}", header); }
+
+InMemoryStatistic::InMemoryStatistic() : streaming_stats_(std::make_unique<StreamingStatistic>()) {}
 
 void InMemoryStatistic::addValue(int64_t sample_value) {
   samples_.push_back(sample_value);
@@ -62,7 +64,7 @@ std::unique_ptr<InMemoryStatistic> InMemoryStatistic::combine(const InMemoryStat
   return combined;
 }
 
-void InMemoryStatistic::dumpToStdOut() {}
+void InMemoryStatistic::dumpToStdOut(std::string header) { ENVOY_LOG(info, "{}", header); }
 
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
@@ -147,19 +149,19 @@ std::unique_ptr<HdrStatistic> HdrStatistic::getCorrected(Frequency frequency) {
   }
   int dropped = hdr_add_while_correcting_for_coordinated_omission(
       h->histogram_, this->histogram_,
-      std::chrono::duration_cast<std::chrono::nanoseconds>(frequency.interval()).count());
+      std::chrono::duration_cast<std::chrono::microseconds>(frequency.interval()).count());
   if (dropped > 0) {
     ENVOY_LOG(warn, "Dropped values while getting the corrected HdrStatistics.");
   }
   return h;
 }
 
-void HdrStatistic::dumpToStdOut() {
+void HdrStatistic::dumpToStdOut(std::string header) {
   if (histogram_ == nullptr) {
     ENVOY_LOG(warn, "HdrHistogram latencies could not be printed.");
     return;
   }
-  ENVOY_LOG(info, "Hdr Latencies (uncorrected).");
+  ENVOY_LOG(info, "{}", header);
   ENVOY_LOG(info, "{:>12} {:>14} (us)", "Percentile", "Latency");
 
   std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
@@ -172,15 +174,20 @@ void HdrStatistic::dumpToStdOut() {
   }
 }
 
-void HdrStatistic::percentilesToProto(nighthawk::client::Output& output) {
+void HdrStatistic::percentilesToProto(nighthawk::client::Output& output, bool corrected) {
   struct hdr_iter iter;
   struct hdr_iter_percentiles* percentiles;
   hdr_iter_percentile_init(&iter, histogram_, 5 /*ticks_per_half_distance*/);
 
   percentiles = &iter.specifics.percentiles;
   while (hdr_iter_next(&iter)) {
-    continue;
-    nighthawk::client::Percentile* percentile = output.add_percentiles();
+    nighthawk::client::Percentile* percentile;
+
+    if (corrected) {
+      percentile = output.add_corrected_percentiles();
+    } else {
+      percentile = output.add_uncorrected_percentiles();
+    }
 
     percentile->mutable_latency()->set_nanos(iter.highest_equivalent_value);
     percentile->set_percentile(percentiles->percentile / 100.0);

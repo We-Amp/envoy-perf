@@ -49,15 +49,15 @@ TYPED_TEST(StatisticTest, Simple) {
   }
 
   auto c = a.combine(b);
-  EXPECT_EQ(6, c.count());
-  if (c.is_high_precision()) {
-    EXPECT_DOUBLE_EQ(1147838.5, c.mean());
-    EXPECT_EQ(7005762373287.5, c.variance());
-    EXPECT_DOUBLE_EQ(2646840.0732359141, c.stdev());
+  EXPECT_EQ(6, c->count());
+  if (c->is_high_precision()) {
+    EXPECT_DOUBLE_EQ(1147838.5, c->mean());
+    EXPECT_EQ(7005762373287.5, c->variance());
+    EXPECT_DOUBLE_EQ(2646840.0732359141, c->stdev());
   } else {
-    EXPECT_NEAR(1147838.5, c.mean(), 6);
-    EXPECT_NEAR(7005762373287.5, c.variance(), 999999999);
-    EXPECT_NEAR(2646840.0732359141, c.stdev(), 99);
+    EXPECT_NEAR(1147838.5, c->mean(), 6);
+    EXPECT_NEAR(7005762373287.5, c->variance(), 999999999);
+    EXPECT_NEAR(2646840.0732359141, c->stdev(), 99);
   }
 }
 

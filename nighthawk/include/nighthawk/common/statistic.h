@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 #include "envoy/common/pure.h"
 
@@ -43,7 +44,7 @@ public:
   /**
    * Dumps a representation of the statistic in plain text to stdout.
    */
-  virtual void dumpToStdOut() PURE;
+  virtual void dumpToStdOut(std::string header) PURE;
 };
 
 } // namespace Nighthawk
