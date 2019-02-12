@@ -8,6 +8,7 @@
 #include "envoy/runtime/runtime.h"
 
 #include "nighthawk/common/rate_limiter.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
 
@@ -22,9 +23,6 @@ public:
             std::chrono::microseconds grace_timeout);
   void start();
   void waitForCompletion();
-  void set_latency_callback(std::function<void(std::chrono::nanoseconds)> latency_callback) {
-    latency_callback_ = std::move(latency_callback);
-  }
 
   // TODO(oschaaf): calling this after stop() will return broken/unexpected results.
   double completions_per_second() {
@@ -35,6 +33,9 @@ public:
     return us == 0 ? 0 : ((targets_completed_ / us) * 1000000);
   }
 
+  HdrStatistic& blocked_statistic() { return blocked_statistic_; }
+  HdrStatistic& latency_statistic() { return latency_statistic_; }
+
 protected:
   void run(bool from_timer);
   void scheduleRun();
@@ -44,6 +45,8 @@ private:
   static const std::chrono::milliseconds ENVOY_TIMER_MIN_RES;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
+  HdrStatistic blocked_statistic_;
+  HdrStatistic latency_statistic_;
   Envoy::Event::TimerPtr periodic_timer_;
   Envoy::Event::TimerPtr incidental_timer_;
   RateLimiter& rate_limiter_;
@@ -54,7 +57,6 @@ private:
   Envoy::MonotonicTime start_;
   uint64_t targets_initiated_;
   uint64_t targets_completed_;
-  std::function<void(const std::chrono::nanoseconds)> latency_callback_;
 };
 
 } // namespace Nighthawk

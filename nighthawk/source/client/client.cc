@@ -31,6 +31,79 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
+class WorkerContext : Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+public:
+  WorkerContext(Envoy::Thread::ThreadFactoryImplPosix& thread_factory,
+                Envoy::ThreadLocal::InstanceImpl& tls, Options& options, int worker_number)
+      : store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
+        api_(std::make_unique<Envoy::Api::Impl>(1000ms, thread_factory, *store_, time_system_)),
+        dispatcher_(api_->allocateDispatcher()),
+        runtime_(Envoy::Runtime::LoaderImpl(generator_, *store_, tls)),
+        worker_number_(worker_number), options_(options) {
+    client_ = std::make_unique<BenchmarkHttpClient>(
+        *dispatcher_, *store_, time_system_, options.uri(),
+        std::make_unique<Envoy::Http::HeaderMapImpl>(), options.h2());
+    client_->set_connection_timeout(options.timeout());
+    client_->set_connection_limit(options.connections());
+    client_->initialize(runtime_);
+    tls.registerThread(*dispatcher_, false);
+    thread_ = thread_factory.createThread([this]() { work(); });
+  }
+
+  void work() {
+    // We try to offset the start of each thread so that workers will execute tasks evenly spaced
+    // in time.
+    double rate = 1 / double(options_.requests_per_second()) / worker_number_;
+    int64_t spread_us = static_cast<int64_t>(rate * worker_number_ * 1000000);
+    ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", worker_number_, spread_us);
+    if (spread_us) {
+      // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
+      // which is rather coarse for our purpose here.
+      usleep(spread_us);
+    }
+
+    // one to warm up.
+    client_->tryStartOne([this] { dispatcher_->exit(); });
+    dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+
+    LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
+    SequencerTarget f =
+        std::bind(&BenchmarkHttpClient::tryStartOne, client_.get(), std::placeholders::_1);
+    Sequencer sequencer(*dispatcher_, time_system_, rate_limiter, f, options_.duration(),
+                        options_.timeout());
+
+    sequencer.start();
+    sequencer.waitForCompletion();
+    HdrStatistic& statistic = sequencer.latency_statistic();
+    ENVOY_LOG(info,
+              "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. Stdev: "
+              "{:.{}f}μs. "
+              "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
+              "resets: {}. ",
+              worker_number_, sequencer.completions_per_second(), 2, statistic.mean() / 1000, 2,
+              statistic.stdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
+              store_->counter("nighthawk.upstream_cx_connect_fail").value(),
+              client_->pool_overflow_failures(), client_->http_good_response_count(),
+              client_->http_bad_response_count(), client_->stream_reset_count());
+    client_.reset();
+  }
+
+  void waitForCompletion() { thread_->join(); }
+
+private:
+  Envoy::Thread::ThreadPtr thread_;
+  Envoy::Event::RealTimeSystem time_system_;
+  std::unique_ptr<Envoy::Stats::IsolatedStoreImpl> store_;
+  std::unique_ptr<Envoy::Api::Impl> api_;
+  Envoy::Event::DispatcherPtr dispatcher_;
+  Envoy::Runtime::RandomGeneratorImpl generator_;
+  Envoy::Runtime::LoaderImpl runtime_;
+  std::unique_ptr<BenchmarkHttpClient> client_;
+  int worker_number_;
+  Options& options_;
+  Envoy::ThreadLocal::SlotPtr slot_;
+};
+
 Main::Main(int argc, const char* const* argv)
     : Main(std::make_unique<Client::OptionsImpl>(argc, argv)) {}
 
@@ -75,7 +148,7 @@ bool Main::run() {
   uint32_t concurrency = autoscale ? cpu_cores_with_affinity : std::stoi(options_->concurrency());
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
-  std::vector<Envoy::Thread::ThreadPtr> threads;
+  std::vector<std::unique_ptr<WorkerContext>> worker_contexts;
   std::vector<std::unique_ptr<HdrStatistic>> global_statistics;
 
   for (uint32_t i = 0; i < concurrency; i++) {
@@ -96,80 +169,18 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
+  Envoy::ThreadLocal::InstanceImpl tls;
   for (uint32_t i = 0; i < concurrency; i++) {
-    // TODO(oschaaf): properly set up and use ThreadLocal::InstanceImpl.
-    auto thread = thread_factory.createThread([&, i]() {
-      auto store = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
-      auto api = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory,
-                                                    *store, *time_system_);
-      auto dispatcher = api->allocateDispatcher();
-      HdrStatistic* statistics = global_statistics[i].get();
-
-      // TODO(oschaaf): not here.
-      Envoy::ThreadLocal::InstanceImpl tls;
-      Envoy::Runtime::RandomGeneratorImpl generator;
-      Envoy::Runtime::LoaderImpl runtime(generator, *store, tls);
-      Envoy::Event::RealTimeSystem time_system;
-
-      auto client = std::make_unique<BenchmarkHttpClient>(
-          *dispatcher, *store, time_system, options_->uri(),
-          std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
-      client->set_connection_timeout(options_->timeout());
-      client->set_connection_limit(options_->connections());
-      client->initialize(runtime);
-
-      // We try to offset the start of each thread so that workers will execute tasks evenly spaced
-      // in time.
-      double rate = 1 / double(options_->requests_per_second()) / concurrency;
-      int64_t spread_us = static_cast<int64_t>(rate * i * 1000000);
-      ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", i, spread_us);
-      if (spread_us) {
-        // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
-        // which is rather coarse for our purpose here.
-        usleep(spread_us);
-      }
-
-      // one to warm up.
-      client->tryStartOne([&dispatcher] { dispatcher->exit(); });
-      dispatcher->run(Envoy::Event::Dispatcher::RunType::Block);
-
-      LinearRateLimiter rate_limiter(time_system, Frequency(options_->requests_per_second()));
-      SequencerTarget f =
-          std::bind(&BenchmarkHttpClient::tryStartOne, client.get(), std::placeholders::_1);
-      Sequencer sequencer(*dispatcher, time_system, rate_limiter, f, options_->duration(),
-                          options_->timeout());
-
-      sequencer.set_latency_callback([statistics](std::chrono::nanoseconds latency) {
-        ASSERT(latency.count() > 0);
-        statistics->addValue(latency.count());
-      });
-
-      sequencer.start();
-      sequencer.waitForCompletion();
-
-      ENVOY_LOG(info,
-                "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. Stdev: "
-                "{:.{}f}μs. "
-                "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
-                "resets: {}. ",
-                i, sequencer.completions_per_second(), 2, statistics->mean() / 1000, 2,
-                statistics->stdev() / 1000, 2,
-                store->counter("nighthawk.upstream_cx_total").value(),
-                store->counter("nighthawk.upstream_cx_connect_fail").value(),
-                client->pool_overflow_failures(), client->http_good_response_count(),
-                client->http_bad_response_count(), client->stream_reset_count());
-      client.reset();
-      // TODO(oschaaf): shouldn't be doing this here.
-      tls.shutdownGlobalThreading();
-    });
-
-    threads.push_back(std::move(thread));
+    worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, tls, *options_, i));
   }
-
-  for (auto& t : threads) {
-    t->join();
+  for (auto& w : worker_contexts) {
+    w->work();
   }
-
+  for (auto& w : worker_contexts) {
+    w->waitForCompletion();
+  }
+  // TODO(oschaaf): shouldn't be doing this here.
+  tls.shutdownGlobalThreading();
   auto merged_statistics = std::make_unique<HdrStatistic>();
   for (uint32_t i = 0; i < concurrency; i++) {
     merged_statistics = merged_statistics->combine(*global_statistics[i]);
