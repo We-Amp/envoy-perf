@@ -14,7 +14,8 @@ namespace Client {
 
 WorkerImpl::WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
                        int worker_number)
-    : thread_factory_(thread_factory), worker_number_(worker_number), options_(options) {}
+    : thread_factory_(thread_factory), worker_number_(worker_number), options_(options),
+      started_(false), completed_(false) {}
 
 void WorkerImpl::start() {
   ASSERT(!started_ && !completed_);
