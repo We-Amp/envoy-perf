@@ -33,8 +33,8 @@ public:
     return us == 0 ? 0 : ((targets_completed_ / us) * 1000000);
   }
 
-  HdrStatistic& blocked_statistic() { return blocked_statistic_; }
-  HdrStatistic& latency_statistic() { return latency_statistic_; }
+  const HdrStatistic& blocked_statistic() { return blocked_statistic_; }
+  const HdrStatistic& latency_statistic() { return latency_statistic_; }
 
 protected:
   void run(bool from_timer);
