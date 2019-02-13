@@ -78,6 +78,7 @@ HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   }
 }
 
+// TODO(oschaaf): valgrind complains when a Histogram is created but never used.
 HdrStatistic::~HdrStatistic() {
   if (histogram_ != nullptr) {
     hdr_close(histogram_);
