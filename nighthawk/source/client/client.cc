@@ -36,21 +36,17 @@ public:
   WorkerContext(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
                 int worker_number)
       : thread_factory_(thread_factory), worker_number_(worker_number), options_(options) {
-    // tls_.registerThread(*dispatcher_, false);
     thread_ = thread_factory.createThread([this]() { work(); });
   }
 
   void work() {
-    Envoy::Event::RealTimeSystem time_system_;
     auto store_ = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
     auto api_ = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory_,
                                                    *store_, time_system_);
     auto dispatcher_ = api_->allocateDispatcher();
-    // HdrStatistic* statistics = global_statistics[i].get();
 
     // TODO(oschaaf): not here.
     Envoy::ThreadLocal::InstanceImpl tls_;
-    Envoy::Runtime::RandomGeneratorImpl generator_;
     Envoy::Runtime::LoaderImpl runtime_(generator_, *store_, tls_);
 
     auto client_ = std::make_unique<BenchmarkHttpClient>(
@@ -79,30 +75,35 @@ public:
     LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
     SequencerTarget f =
         std::bind(&BenchmarkHttpClient::tryStartOne, client_.get(), std::placeholders::_1);
-    Sequencer sequencer(*dispatcher_, time_system_, rate_limiter, f, options_.duration(),
-                        options_.timeout());
+    sequencer_.reset(new Sequencer(*dispatcher_, time_system_, rate_limiter, f, options_.duration(),
+                                   options_.timeout()));
 
-    sequencer.start();
-    sequencer.waitForCompletion();
-    HdrStatistic& statistic = sequencer.latency_statistic();
+    sequencer_->start();
+    sequencer_->waitForCompletion();
+
     ENVOY_LOG(info,
               "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. Stdev: "
               "{:.{}f}μs. "
               "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
               "resets: {}. ",
-              worker_number_, sequencer.completions_per_second(), 2, statistic.mean() / 1000, 2,
-              statistic.stdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
+              worker_number_, sequencer_->completions_per_second(), 2, statistic().mean() / 1000, 2,
+              statistic().stdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
               store_->counter("nighthawk.upstream_cx_connect_fail").value(),
               client_->pool_overflow_failures(), client_->http_good_response_count(),
               client_->http_bad_response_count(), client_->stream_reset_count());
-    client_.reset();
+    // Drop everything that is outstanding by resetting the client.
+    // client_.reset();
     // TODO(oschaaf): shouldn't be doing this here.
     tls_.shutdownGlobalThreading();
   }
 
   void waitForCompletion() { thread_->join(); }
+  const HdrStatistic& statistic() { return sequencer_->latency_statistic(); }
 
 private:
+  Envoy::Runtime::RandomGeneratorImpl generator_;
+  Envoy::Event::RealTimeSystem time_system_;
+  std::unique_ptr<Sequencer> sequencer_;
   Envoy::Thread::ThreadFactoryImplPosix& thread_factory_;
   Envoy::Thread::ThreadPtr thread_;
   int worker_number_;
@@ -133,9 +134,6 @@ void Main::configureComponentLogLevels(spdlog::level::level_enum level) {
 bool Main::run() {
   // TODO(oschaaf): platform specificity need addressing.
   auto thread_factory = Envoy::Thread::ThreadFactoryImplPosix();
-  nighthawk::client::Output output;
-  output.set_allocated_options(options_->toCommandLineOptions().release());
-
   Envoy::Thread::MutexBasicLockable log_lock;
   auto logging_context = std::make_unique<Envoy::Logger::Context>(
       spdlog::level::from_str(options_->verbosity()), "[%T.%f][%t][%L] %v", log_lock);
@@ -152,14 +150,6 @@ bool Main::run() {
   // (e.g. we are called via taskset).
   uint32_t concurrency = autoscale ? cpu_cores_with_affinity : std::stoi(options_->concurrency());
 
-  // We're going to fire up #concurrency benchmark loops and wait for them to complete.
-  std::vector<std::unique_ptr<WorkerContext>> worker_contexts;
-  std::vector<std::unique_ptr<HdrStatistic>> global_statistics;
-
-  for (uint32_t i = 0; i < concurrency; i++) {
-    global_statistics.push_back(std::make_unique<HdrStatistic>());
-  }
-
   if (autoscale) {
     ENVOY_LOG(info, "Detected {} (v)CPUs with affinity..", cpu_cores_with_affinity);
   }
@@ -174,16 +164,18 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
+  // We're going to fire up #concurrency benchmark loops and wait for them to complete.
+  std::vector<std::unique_ptr<WorkerContext>> worker_contexts;
   for (uint32_t i = 0; i < concurrency; i++) {
     worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, *options_, i));
   }
+
+  auto merged_statistics = std::make_unique<HdrStatistic>();
   for (auto& w : worker_contexts) {
     w->waitForCompletion();
+    merged_statistics = merged_statistics->combine(w->statistic());
   }
-  auto merged_statistics = std::make_unique<HdrStatistic>();
-  for (uint32_t i = 0; i < concurrency; i++) {
-    merged_statistics = merged_statistics->combine(*global_statistics[i]);
-  }
+
   if (concurrency > 1) {
     ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
               merged_statistics->count(), merged_statistics->mean() / 1000, 2,
@@ -193,6 +185,8 @@ bool Main::run() {
   auto corrected = merged_statistics->getCorrected(Frequency(options_->requests_per_second()));
   corrected->dumpToStdOut("Corrected latencies");
 
+  nighthawk::client::Output output;
+  output.set_allocated_options(options_->toCommandLineOptions().release());
   output.set_request_count(merged_statistics->count());
   output.mutable_mean()->set_nanos(merged_statistics->mean());
   output.mutable_stdev()->set_nanos(merged_statistics->stdev());
@@ -206,7 +200,7 @@ bool Main::run() {
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;
-  // google::protobuf::util::MessageToJsonString(output, &str, options);
+  google::protobuf::util::MessageToJsonString(output, &str, options);
 
   mkdir("measurements", 0777);
   std::ofstream stream;
@@ -215,7 +209,9 @@ bool Main::run() {
   stream.open(filename);
   stream << str;
   ENVOY_LOG(info, "Done. Wrote {}.", filename);
-
+  for (auto& w : worker_contexts) {
+    w.release();
+  }
   return true;
 }
 
