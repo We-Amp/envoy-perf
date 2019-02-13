@@ -64,7 +64,7 @@ public:
   std::unique_ptr<HdrStatistic> getCorrected(Frequency frequency);
   virtual bool is_high_precision() override { return false; }
   void dumpToStdOut(std::string header) override;
-  void percentilesToProto(nighthawk::client::Output& output, bool corrected);
+  void percentilesToProto(nighthawk::client::Output& output);
 
 private:
   struct hdr_histogram* histogram_;

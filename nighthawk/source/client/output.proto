@@ -21,6 +21,5 @@ message Output {
   google.protobuf.Duration mean = 3;
   google.protobuf.Duration stdev = 4;
   uint64 request_count = 5;
-  repeated Percentile uncorrected_percentiles = 6;
-  repeated Percentile corrected_percentiles = 7;
+  repeated Percentile latency_percentiles = 6;
 }

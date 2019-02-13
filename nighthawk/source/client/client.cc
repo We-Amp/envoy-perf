@@ -10,19 +10,15 @@
 #include <google/protobuf/util/json_util.h>
 
 #include "common/api/api_impl.h"
-#include "common/common/compiler_requirements.h"
-#include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
 
-#include "nighthawk/source/client/benchmark_http_client.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
+#include "nighthawk/source/client/output_formatter_impl.h"
+#include "nighthawk/source/client/worker_impl.h"
 #include "nighthawk/source/common/frequency.h"
-#include "nighthawk/source/common/rate_limiter_impl.h"
-#include "nighthawk/source/common/sequencer.h"
 #include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/utility.h"
 
@@ -30,85 +26,6 @@ using namespace std::chrono_literals;
 
 namespace Nighthawk {
 namespace Client {
-
-class WorkerContext : Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
-public:
-  WorkerContext(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
-                int worker_number)
-      : thread_factory_(thread_factory), worker_number_(worker_number), options_(options) {
-    thread_ = thread_factory.createThread([this]() { work(); });
-  }
-
-  void work() {
-    auto store_ = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
-    auto api_ = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory_,
-                                                   *store_, time_system_);
-    auto dispatcher_ = api_->allocateDispatcher();
-
-    // TODO(oschaaf): not here.
-    Envoy::ThreadLocal::InstanceImpl tls_;
-    Envoy::Runtime::LoaderImpl runtime_(generator_, *store_, tls_);
-
-    auto client_ = std::make_unique<BenchmarkHttpClient>(
-        *dispatcher_, *store_, time_system_, options_.uri(),
-        std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
-
-    client_->set_connection_timeout(options_.timeout());
-    client_->set_connection_limit(options_.connections());
-    client_->initialize(runtime_);
-
-    // We try to offset the start of each thread so that workers will execute tasks evenly spaced
-    // in time.
-    double rate = 1 / double(options_.requests_per_second()) / worker_number_;
-    int64_t spread_us = static_cast<int64_t>(rate * worker_number_ * 1000000);
-    ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", worker_number_, spread_us);
-    if (spread_us) {
-      // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
-      // which is rather coarse for our purpose here.
-      usleep(spread_us);
-    }
-
-    // one to warm up.
-    client_->tryStartOne([&dispatcher_] { dispatcher_->exit(); });
-    dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
-
-    LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
-    SequencerTarget f =
-        std::bind(&BenchmarkHttpClient::tryStartOne, client_.get(), std::placeholders::_1);
-    sequencer_.reset(new Sequencer(*dispatcher_, time_system_, rate_limiter, f, options_.duration(),
-                                   options_.timeout()));
-
-    sequencer_->start();
-    sequencer_->waitForCompletion();
-
-    ENVOY_LOG(info,
-              "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. Stdev: "
-              "{:.{}f}μs. "
-              "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
-              "resets: {}. ",
-              worker_number_, sequencer_->completions_per_second(), 2, statistic().mean() / 1000, 2,
-              statistic().stdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
-              store_->counter("nighthawk.upstream_cx_connect_fail").value(),
-              client_->pool_overflow_failures(), client_->http_good_response_count(),
-              client_->http_bad_response_count(), client_->stream_reset_count());
-    // Drop everything that is outstanding by resetting the client.
-    client_.reset();
-    // TODO(oschaaf): shouldn't be doing this here.
-    tls_.shutdownGlobalThreading();
-  }
-
-  void waitForCompletion() { thread_->join(); }
-  const HdrStatistic& statistic() { return sequencer_->latency_statistic(); }
-
-private:
-  Envoy::Runtime::RandomGeneratorImpl generator_;
-  Envoy::Event::RealTimeSystem time_system_;
-  std::unique_ptr<Sequencer> sequencer_;
-  Envoy::Thread::ThreadFactoryImplPosix& thread_factory_;
-  Envoy::Thread::ThreadPtr thread_;
-  int worker_number_;
-  Options& options_;
-};
 
 Main::Main(int argc, const char* const* argv)
     : Main(std::make_unique<Client::OptionsImpl>(argc, argv)) {}
@@ -165,27 +82,25 @@ bool Main::run() {
   }
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
-  std::vector<std::unique_ptr<WorkerContext>> worker_contexts;
+  std::vector<WorkerImplPtr> workers;
   for (uint32_t i = 0; i < concurrency; i++) {
-    worker_contexts.push_back(std::make_unique<WorkerContext>(thread_factory, *options_, i));
+    workers.push_back(std::make_unique<WorkerImpl>(thread_factory, *options_, i));
+    workers[i]->start();
   }
 
   auto merged_statistics = std::make_unique<HdrStatistic>();
-  for (auto& w : worker_contexts) {
+  for (auto& w : workers) {
     w->waitForCompletion();
     merged_statistics = merged_statistics->combine(w->statistic());
-    w.reset(nullptr);
   }
+  workers.clear();
 
   if (concurrency > 1) {
     ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
               merged_statistics->count(), merged_statistics->mean() / 1000, 2,
               merged_statistics->stdev() / 1000, 2);
   }
-  // merged_statistics->dumpToStdOut("Uncorrected latencies");
-  auto corrected = merged_statistics->getCorrected(Frequency(options_->requests_per_second()));
-  // corrected->dumpToStdOut("Corrected latencies");
-
+  merged_statistics->dumpToStdOut("Measured latencies");
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
   output.set_request_count(merged_statistics->count());
@@ -196,8 +111,7 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  // merged_statistics->percentilesToProto(output, false /* corrected */);
-  // corrected->percentilesToProto(output, true /* corrected */);
+  merged_statistics->percentilesToProto(output);
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;
@@ -210,9 +124,6 @@ bool Main::run() {
   stream.open(filename);
   stream << str;
   ENVOY_LOG(info, "Done. Wrote {}.", filename);
-  for (auto& w : worker_contexts) {
-    w.release();
-  }
   return true;
 }
 

@@ -4,12 +4,13 @@
 
 #include "envoy/common/pure.h"
 
+#include "nighthawk/source/common/statistic_impl.h"
+
 namespace Nighthawk {
 namespace Client {
 
 /**
- * @brief Interface for a threaded benchmark client worker.
- *
+ * Interface for a threaded benchmark client worker.
  */
 class Worker {
 public:
@@ -23,23 +24,17 @@ public:
   /**
    * Stop the worker thread.
    */
-  virtual void stop() PURE;
+  virtual void waitForCompletion() PURE;
+
+  // TODO(oschaaf): Stop exposing the implementation of statistic here.
+  /**
+   * Get the latency statistics. Only to be called after waitForCompletion().
+   * @return const HdrStatistic&
+   */
+  virtual const HdrStatistic& statistic() PURE;
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;
-
-/**
- * Factory for creating workers.
- */
-class WorkerFactory {
-public:
-  virtual ~WorkerFactory() {}
-
-  /**
-   * @return WorkerPtr a new worker.
-   */
-  virtual WorkerPtr createWorker() PURE;
-};
 
 } // namespace Client
 } // namespace Nighthawk

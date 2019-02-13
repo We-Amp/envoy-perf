@@ -7,7 +7,6 @@
 #include "envoy/stats/store.h"
 
 #include "nighthawk/client/options.h"
-#include "nighthawk/client/worker.h"
 
 namespace Nighthawk {
 namespace Client {

@@ -175,7 +175,7 @@ void HdrStatistic::dumpToStdOut(std::string header) {
   }
 }
 
-void HdrStatistic::percentilesToProto(nighthawk::client::Output& output, bool corrected) {
+void HdrStatistic::percentilesToProto(nighthawk::client::Output& output) {
   struct hdr_iter iter;
   struct hdr_iter_percentiles* percentiles;
   hdr_iter_percentile_init(&iter, histogram_, 5 /*ticks_per_half_distance*/);
@@ -184,11 +184,7 @@ void HdrStatistic::percentilesToProto(nighthawk::client::Output& output, bool co
   while (hdr_iter_next(&iter)) {
     nighthawk::client::Percentile* percentile;
 
-    if (corrected) {
-      percentile = output.add_corrected_percentiles();
-    } else {
-      percentile = output.add_uncorrected_percentiles();
-    }
+    percentile = output.add_latency_percentiles();
 
     percentile->mutable_latency()->set_nanos(iter.highest_equivalent_value);
     percentile->set_percentile(percentiles->percentile / 100.0);
