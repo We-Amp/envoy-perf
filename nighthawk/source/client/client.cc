@@ -174,6 +174,7 @@ bool Main::run() {
   for (auto& w : worker_contexts) {
     w->waitForCompletion();
     merged_statistics = merged_statistics->combine(w->statistic());
+    w.reset(nullptr);
   }
 
   if (concurrency > 1) {
@@ -181,9 +182,9 @@ bool Main::run() {
               merged_statistics->count(), merged_statistics->mean() / 1000, 2,
               merged_statistics->stdev() / 1000, 2);
   }
-  merged_statistics->dumpToStdOut("Uncorrected latencies");
+  // merged_statistics->dumpToStdOut("Uncorrected latencies");
   auto corrected = merged_statistics->getCorrected(Frequency(options_->requests_per_second()));
-  corrected->dumpToStdOut("Corrected latencies");
+  // corrected->dumpToStdOut("Corrected latencies");
 
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
@@ -195,8 +196,8 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  merged_statistics->percentilesToProto(output, false /* corrected */);
-  corrected->percentilesToProto(output, true /* corrected */);
+  // merged_statistics->percentilesToProto(output, false /* corrected */);
+  // corrected->percentilesToProto(output, true /* corrected */);
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

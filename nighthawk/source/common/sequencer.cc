@@ -33,6 +33,8 @@ void Sequencer::scheduleRun() { periodic_timer_->enableTimer(ENVOY_TIMER_MIN_RES
 void Sequencer::stop() {
   periodic_timer_->disableTimer();
   incidental_timer_->disableTimer();
+  periodic_timer_.reset(nullptr);
+  incidental_timer_.reset(nullptr);
   dispatcher_.exit();
 }
 
