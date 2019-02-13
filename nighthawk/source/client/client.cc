@@ -92,7 +92,7 @@ public:
               client_->pool_overflow_failures(), client_->http_good_response_count(),
               client_->http_bad_response_count(), client_->stream_reset_count());
     // Drop everything that is outstanding by resetting the client.
-    // client_.reset();
+    client_.reset();
     // TODO(oschaaf): shouldn't be doing this here.
     tls_.shutdownGlobalThreading();
   }
