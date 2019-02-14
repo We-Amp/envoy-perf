@@ -88,9 +88,10 @@ public:
   std::unique_ptr<HdrStatistic> getCorrected(Frequency frequency);
   void dumpToStdOut(std::string header) override;
   void toProtoOutput(nighthawk::client::Output& output) override;
-  virtual bool is_high_precision() override { return false; }
+  virtual uint64_t significant_digits() override { return SIGNIFICANT_DIGITS; }
 
 private:
+  static const int SIGNIFICANT_DIGITS;
   struct hdr_histogram* histogram_;
 };
 

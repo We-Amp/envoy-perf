@@ -72,14 +72,16 @@ void InMemoryStatistic::dumpToStdOut(std::string header) { ENVOY_LOG(info, "{}",
 
 void InMemoryStatistic::toProtoOutput(nighthawk::client::Output&) { ASSERT(false); }
 
+const int HdrStatistic::SIGNIFICANT_DIGITS = 4;
+
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
   const int64_t max_latency = 1000L * 1000 * 1000 * 60;
 
-  int status =
-      hdr_init(1 /* min trackable value */, max_latency, 4 /* significant digits */, &histogram_);
+  int status = hdr_init(1 /* min trackable value */, max_latency, HdrStatistic::SIGNIFICANT_DIGITS,
+                        &histogram_);
   if (status != 0) {
-    ENVOY_LOG(error, "Failed to intialize HdrHistogram.");
+    ENVOY_LOG(error, "Failed to initialize HdrHistogram.");
     histogram_ = nullptr;
   }
 }

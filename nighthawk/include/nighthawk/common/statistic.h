@@ -30,10 +30,9 @@ public:
 
   /**
    * Only used in tests to match expectations to the right precision level.
-   * @return true Computed values should be considered as high precision in tests.
-   * @return false Computed values should be considered as less precise in tests.
+   * @return Number of significant digits. 0 is assumed to be max precision.
    */
-  virtual bool is_high_precision() { return true; }
+  virtual uint64_t significant_digits() { return 0; }
 
   /**
    * Dumps a representation of the statistic in plain text to stdout.

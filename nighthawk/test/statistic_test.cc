@@ -10,6 +10,29 @@ using MyTypes = ::testing::Types<InMemoryStatistic, HdrStatistic, StreamingStati
 
 template <typename T> class StatisticTest : public testing::Test {};
 
+class Helper {
+public:
+  /**
+   * With 0 significant digits passed, this uses EXPECT_DOUBLE_EQ. Otherwise EXPECT_NEAR
+   * will be called with a computed acceptable range based on the number of significant
+   * digits and tested_value.
+   * @param expected_value the expected value
+   * @param tested_value the tested_value
+   * @param significant the number of significant digits that should be used to compare values.
+   */
+  static void expect_near(double expected_value, double tested_value, uint64_t significant) {
+    if (significant > 0) {
+      EXPECT_NEAR(expected_value, tested_value,
+                  std::pow(10, std::ceil(std::log10(tested_value)) - 1 - significant));
+    } else {
+      EXPECT_DOUBLE_EQ(expected_value, tested_value);
+    }
+  }
+
+private:
+  Helper() = default;
+};
+
 TYPED_TEST_SUITE(StatisticTest, MyTypes);
 
 TYPED_TEST(StatisticTest, Simple) {
@@ -22,43 +45,26 @@ TYPED_TEST(StatisticTest, Simple) {
   for (int value : a_values) {
     a.addValue(value);
   }
+  EXPECT_EQ(3, a.count());
+
   for (int value : b_values) {
     b.addValue(value);
   }
-
-  EXPECT_EQ(3, a.count());
-  EXPECT_EQ(2, a.mean());
-  EXPECT_EQ(1, a.variance());
-  EXPECT_EQ(1, a.stdev());
-
   EXPECT_EQ(3, b.count());
 
-  // TODO(oschaaf):
-  if (b.is_high_precision()) {
-    EXPECT_EQ(2295675, b.mean());
-    EXPECT_EQ(13561820041021, b.variance());
-    EXPECT_DOUBLE_EQ(3682637.6472605884, b.stdev());
-  } else {
-    // HdrHistogram is up to 5 digits precise.
-    // We configure it to 3 (similar to wrk2).
-    // Note that we repeat this test with higher precision for
-    // the streaming stats below.
-    EXPECT_NEAR(2295675, b.mean(), 11);
-    EXPECT_NEAR(13561820041021, b.variance(), 999999999);
-    EXPECT_NEAR(3682637.6472605884, b.stdev(), 99);
-  }
+  Helper::expect_near(2, a.mean(), a.significant_digits());
+  Helper::expect_near(1, a.variance(), a.significant_digits());
+  Helper::expect_near(1, a.stdev(), a.significant_digits());
+
+  Helper::expect_near(2295675, b.mean(), a.significant_digits());
+  Helper::expect_near(13561820041021, b.variance(), a.significant_digits());
+  Helper::expect_near(3682637.6472605884, b.stdev(), a.significant_digits());
 
   auto c = a.combine(b);
   EXPECT_EQ(6, c->count());
-  if (c->is_high_precision()) {
-    EXPECT_DOUBLE_EQ(1147838.5, c->mean());
-    EXPECT_EQ(7005762373287.5, c->variance());
-    EXPECT_DOUBLE_EQ(2646840.0732359141, c->stdev());
-  } else {
-    EXPECT_NEAR(1147838.5, c->mean(), 6);
-    EXPECT_NEAR(7005762373287.5, c->variance(), 999999999);
-    EXPECT_NEAR(2646840.0732359141, c->stdev(), 99);
-  }
+  Helper::expect_near(1147838.5, c->mean(), c->significant_digits());
+  Helper::expect_near(7005762373287.5, c->variance(), c->significant_digits());
+  Helper::expect_near(2646840.0732359141, c->stdev(), c->significant_digits());
 }
 
 } // namespace Nighthawk
