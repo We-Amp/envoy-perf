@@ -32,12 +32,12 @@ public:
    * Only used in tests to match expectations to the right precision level.
    * @return Number of significant digits. 0 is assumed to be max precision.
    */
-  virtual uint64_t significant_digits() { return 0; }
+  virtual uint64_t significant_digits() const { return 0; }
 
   /**
    * Dumps a representation of the statistic in plain text to stdout.
    */
-  virtual void dumpToStdOut(std::string header) PURE;
+  virtual void dumpToStdOut(const std::string& header) const PURE;
 
   /**
    * Updates the proto output to reflect the contents of the statistic.

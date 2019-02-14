@@ -95,17 +95,9 @@ bool Main::run() {
   }
   workers.clear();
 
-  if (concurrency > 1) {
-    ENVOY_LOG(info, "Global #complete:{}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.",
-              merged_statistics->count(), merged_statistics->mean() / 1000, 2,
-              merged_statistics->stdev() / 1000, 2);
-  }
-  merged_statistics->dumpToStdOut("Measured latencies");
+  merged_statistics->dumpToStdOut(concurrency > 1 ? "X-Thread statistics" : "Statistics");
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
-  output.set_request_count(merged_statistics->count());
-  output.mutable_mean()->set_nanos(merged_statistics->mean());
-  output.mutable_stdev()->set_nanos(merged_statistics->stdev());
 
   struct timeval tv;
   gettimeofday(&tv, NULL);

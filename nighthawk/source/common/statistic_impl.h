@@ -12,12 +12,17 @@
 
 namespace Nighthawk {
 
+class StatisticImpl : public Statistic, public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+public:
+  void dumpToStdOut(const std::string& header) const override;
+  void toProtoOutput(nighthawk::client::Output& output) override;
+};
+
 /**
  * Simple statistic that keeps track of count/mean/var/stdev with low memory
  * requirements.
  */
-class StreamingStatistic : public Statistic,
-                           public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+class StreamingStatistic : public StatisticImpl {
 public:
   StreamingStatistic();
   void addValue(int64_t value) override;
@@ -26,8 +31,6 @@ public:
   double variance() const override;
   double stdev() const override;
   std::unique_ptr<Statistic> combine(const Statistic& a) override;
-  void dumpToStdOut(std::string header) override;
-  void toProtoOutput(nighthawk::client::Output& output) override;
 
 private:
   uint64_t count_;
@@ -40,8 +43,7 @@ private:
  * Stores the raw latencies in-memory, which may accumulate to a lot
  * of data(!). Not used right now, but useful for debugging purposes.
  */
-class InMemoryStatistic : public Statistic,
-                          public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+class InMemoryStatistic : public StatisticImpl {
 public:
   InMemoryStatistic();
   void addValue(int64_t sample_value) override;
@@ -50,8 +52,6 @@ public:
   double variance() const override;
   double stdev() const override;
   std::unique_ptr<Statistic> combine(const Statistic& a) override;
-  void dumpToStdOut(std::string header) override;
-  void toProtoOutput(nighthawk::client::Output& output) override;
 
 private:
   std::vector<int64_t> samples_;
@@ -61,7 +61,7 @@ private:
 /**
  * HdrStatistic uses HdrHistogram under the hood to compute statistics.
  */
-class HdrStatistic : public Statistic, public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+class HdrStatistic : public StatisticImpl {
 public:
   HdrStatistic();
   virtual ~HdrStatistic() override;
@@ -85,10 +85,10 @@ public:
    * NOTE: this is neither used nor tested at the moment.
    * @returns HdrStatistic unique_ptr.
    */
-  std::unique_ptr<HdrStatistic> getCorrected(Frequency frequency);
-  void dumpToStdOut(std::string header) override;
+  std::unique_ptr<HdrStatistic> getCorrected(const Frequency& frequency);
+  void dumpToStdOut(const std::string& header) const override;
   void toProtoOutput(nighthawk::client::Output& output) override;
-  virtual uint64_t significant_digits() override { return SIGNIFICANT_DIGITS; }
+  virtual uint64_t significant_digits() const override { return SIGNIFICANT_DIGITS; }
 
 private:
   static const int SIGNIFICANT_DIGITS;
