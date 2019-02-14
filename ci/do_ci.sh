@@ -37,9 +37,9 @@ if [ -n "$CIRCLECI" ]; then
         mv "${HOME:-/root}/.gitconfig" "${HOME:-/root}/.gitconfig_save"
         echo 1
     fi
-    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --jobs 4"
-    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --jobs 4 --local_test_jobs=4"
-    export MAKEFLAGS="-j 4"
+    export BAZEL_BUILD_OPTIONS="${BAZEL_BUILD_OPTIONS} --jobs 8"
+    export BAZEL_TEST_OPTIONS="${BAZEL_TEST_OPTIONS} --jobs 8 --local_test_jobs=8"
+    export MAKEFLAGS="-j 8"
 fi
 
 if [ "$1" != "coverage" ]; then

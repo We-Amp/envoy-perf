@@ -23,8 +23,6 @@ envoy_cc_test(
     repository = "@envoy",
     deps = [
         "//nighthawk/source/client:nighthawk_client_lib",
-        "@envoy//source/common/common:minimal_logger_lib",
-        "@envoy//source/common/common:non_copyable",
         "@envoy//test/integration:integration_lib",
         "@envoy//test/server:utility_lib",
     ],
