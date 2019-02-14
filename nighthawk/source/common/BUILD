@@ -31,6 +31,7 @@ envoy_cc_library(
         "//nighthawk/include/nighthawk/common:base_includes",
         "//nighthawk/source/client:benchmark_options_cc",
         "@envoy//source/common/common:compiler_requirements_lib",
+        "@envoy//source/common/common:minimal_logger_lib",
         "@envoy//source/common/common:thread_impl_lib_posix",
         "@envoy//source/common/stats:stats_lib",
         "@envoy//source/exe:envoy_common_lib",

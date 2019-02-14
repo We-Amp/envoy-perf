@@ -88,7 +88,7 @@ bool Main::run() {
     workers[i]->start();
   }
 
-  auto merged_statistics = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> merged_statistics = std::make_unique<HdrStatistic>();
   for (auto& w : workers) {
     w->waitForCompletion();
     merged_statistics = merged_statistics->combine(w->statistic());
@@ -111,7 +111,7 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  merged_statistics->percentilesToProto(output);
+  merged_statistics->toProtoOutput(output);
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

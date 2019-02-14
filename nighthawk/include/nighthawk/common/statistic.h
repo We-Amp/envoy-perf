@@ -4,14 +4,17 @@
 #include <memory>
 #include <string>
 
+#include "common/common/non_copyable.h"
 #include "envoy/common/pure.h"
+
+#include "nighthawk/source/client/output.pb.h"
 
 namespace Nighthawk {
 
 /**
  * Abstract interface for a statistic.
  */
-template <class T> class Statistic {
+class Statistic : Envoy::NonCopyable {
 public:
   virtual ~Statistic() = default;
   /**
@@ -26,15 +29,6 @@ public:
   virtual double stdev() const PURE;
 
   /**
-   * Combines two Statistics into one, and returns a new, merged, Statistic.
-   * This is useful for computing results from multiple workers into a
-   * single global view.
-   * @param a The Statistic that should be combined with this instance.
-   * @return T Merged Statistic instance.
-   */
-  virtual std::unique_ptr<T> combine(const T& a) PURE;
-
-  /**
    * Only used in tests to match expectations to the right precision level.
    * @return true Computed values should be considered as high precision in tests.
    * @return false Computed values should be considered as less precise in tests.
@@ -45,6 +39,20 @@ public:
    * Dumps a representation of the statistic in plain text to stdout.
    */
   virtual void dumpToStdOut(std::string header) PURE;
+
+  /**
+   * Updates the proto output to reflect the contents of the statistic.
+   */
+  virtual void toProtoOutput(nighthawk::client::Output& output) PURE;
+
+  /**
+   * Combines two Statistics into one, and returns a new, merged, Statistic.
+   * This is useful for computing results from multiple workers into a
+   * single global view.
+   * @param a The Statistic that should be combined with this instance.
+   * @return T Merged Statistic instance.
+   */
+  virtual std::unique_ptr<Statistic> combine(const Statistic& a) PURE;
 };
 
 } // namespace Nighthawk

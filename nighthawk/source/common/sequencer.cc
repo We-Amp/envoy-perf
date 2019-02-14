@@ -78,7 +78,10 @@ void Sequencer::run(bool from_timer) {
     if (ok) {
       targets_initiated_++;
     } else {
-      // TODO(oschaaf): this is where we run into coordinated omission.
+      // This should only happen when we are running in closed-loop mode, which is always at the
+      // time of writing this.
+      // TODO(oschaaf): Create a specific statistic for tracking time spend here and report.
+      // Measurements will be skewed.
       rate_limiter_.releaseOne();
       break;
     }
@@ -86,10 +89,12 @@ void Sequencer::run(bool from_timer) {
 
   if (!from_timer) {
     if (targets_initiated_ == targets_completed_) {
+      // TODO(oschaaf): Ideally we would have much finer grained timers instead.
+      // TODO(oschaaf): Optionize performing this spin loop.
       // We saturated the rate limiter, and there's no outstanding work.
       // That means it looks like we are idle. Spin this event to improve
-      // accuracy.
-      // TODO(oschaaf): ideally we would have much finer grained timers instead.
+      // accuracy. As a side-effect, this may help prevent CPU frequency scaling
+      // due to c-state. But on the other hand it may cause thermal throttling.
       pthread_yield();
       incidental_timer_->enableTimer(0ms);
     }

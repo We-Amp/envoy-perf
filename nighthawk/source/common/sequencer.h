@@ -12,10 +12,8 @@
 
 namespace Nighthawk {
 
-// TODO(oschaaf): consider renaming this to BenchmarkTarget or some such.
 using SequencerTarget = std::function<bool(std::function<void()>)>;
 
-// TODO(oschaaf): consider renaming this to benchmarker some such.
 class Sequencer : public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   Sequencer(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,

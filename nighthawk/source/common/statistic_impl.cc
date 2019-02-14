@@ -26,8 +26,9 @@ double StreamingStatistic::variance() const { return sum_of_squares_ / (count_ -
 
 double StreamingStatistic::stdev() const { return sqrt(variance()); }
 
-std::unique_ptr<StreamingStatistic> StreamingStatistic::combine(const StreamingStatistic& b) {
+std::unique_ptr<Statistic> StreamingStatistic::combine(const Statistic& statistic) {
   const StreamingStatistic& a = *this;
+  const StreamingStatistic& b = dynamic_cast<const StreamingStatistic&>(statistic);
   auto combined = std::make_unique<StreamingStatistic>();
 
   combined->count_ = a.count() + b.count();
@@ -39,6 +40,8 @@ std::unique_ptr<StreamingStatistic> StreamingStatistic::combine(const StreamingS
 }
 
 void StreamingStatistic::dumpToStdOut(std::string header) { ENVOY_LOG(info, "{}", header); }
+
+void StreamingStatistic::toProtoOutput(nighthawk::client::Output&) { ASSERT(false); }
 
 InMemoryStatistic::InMemoryStatistic() : streaming_stats_(std::make_unique<StreamingStatistic>()) {}
 
@@ -55,8 +58,9 @@ double InMemoryStatistic::mean() const { return streaming_stats_->mean(); }
 double InMemoryStatistic::variance() const { return streaming_stats_->variance(); }
 double InMemoryStatistic::stdev() const { return streaming_stats_->stdev(); }
 
-std::unique_ptr<InMemoryStatistic> InMemoryStatistic::combine(const InMemoryStatistic& b) {
+std::unique_ptr<Statistic> InMemoryStatistic::combine(const Statistic& statistic) {
   auto combined = std::make_unique<InMemoryStatistic>();
+  const InMemoryStatistic& b = dynamic_cast<const InMemoryStatistic&>(statistic);
 
   combined->samples_.insert(combined->samples_.end(), this->samples_.begin(), this->samples_.end());
   combined->samples_.insert(combined->samples_.end(), b.samples_.begin(), b.samples_.end());
@@ -65,6 +69,8 @@ std::unique_ptr<InMemoryStatistic> InMemoryStatistic::combine(const InMemoryStat
 }
 
 void InMemoryStatistic::dumpToStdOut(std::string header) { ENVOY_LOG(info, "{}", header); }
+
+void InMemoryStatistic::toProtoOutput(nighthawk::client::Output&) { ASSERT(false); }
 
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
@@ -127,8 +133,9 @@ double HdrStatistic::stdev() const {
   return sqrt(geometric_dev_total / (histogram_->total_count - 1));
 }
 
-std::unique_ptr<HdrStatistic> HdrStatistic::combine(const HdrStatistic& b) {
+std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) {
   auto combined = std::make_unique<HdrStatistic>();
+  const HdrStatistic& b = dynamic_cast<const HdrStatistic&>(statistic);
 
   if (this->histogram_ == nullptr || b.histogram_ == nullptr) {
     return combined;
@@ -175,7 +182,7 @@ void HdrStatistic::dumpToStdOut(std::string header) {
   }
 }
 
-void HdrStatistic::percentilesToProto(nighthawk::client::Output& output) {
+void HdrStatistic::toProtoOutput(nighthawk::client::Output& output) {
   struct hdr_iter iter;
   struct hdr_iter_percentiles* percentiles;
   hdr_iter_percentile_init(&iter, histogram_, 5 /*ticks_per_half_distance*/);
