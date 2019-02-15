@@ -95,7 +95,8 @@ bool Main::run() {
   }
   workers.clear();
 
-  merged_statistics->dumpToStdOut(concurrency > 1 ? "X-Thread statistics" : "Statistics");
+  ENVOY_LOG(info, "{}", concurrency > 1 ? "X-Thread statistics" : "Statistics");
+  ENVOY_LOG(info, "{}", merged_statistics->toString());
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
 

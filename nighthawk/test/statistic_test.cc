@@ -52,19 +52,19 @@ TYPED_TEST(StatisticTest, Simple) {
   }
   EXPECT_EQ(3, b.count());
 
-  Helper::expect_near(2, a.mean(), a.significant_digits());
-  Helper::expect_near(1, a.variance(), a.significant_digits());
-  Helper::expect_near(1, a.stdev(), a.significant_digits());
+  Helper::expect_near(2, a.mean(), a.significantDigits());
+  Helper::expect_near(1, a.variance(), a.significantDigits());
+  Helper::expect_near(1, a.stdev(), a.significantDigits());
 
-  Helper::expect_near(2295675, b.mean(), a.significant_digits());
-  Helper::expect_near(13561820041021, b.variance(), a.significant_digits());
-  Helper::expect_near(3682637.6472605884, b.stdev(), a.significant_digits());
+  Helper::expect_near(2295675, b.mean(), a.significantDigits());
+  Helper::expect_near(13561820041021, b.variance(), a.significantDigits());
+  Helper::expect_near(3682637.6472605884, b.stdev(), a.significantDigits());
 
   auto c = a.combine(b);
   EXPECT_EQ(6, c->count());
-  Helper::expect_near(1147838.5, c->mean(), c->significant_digits());
-  Helper::expect_near(7005762373287.5, c->variance(), c->significant_digits());
-  Helper::expect_near(2646840.0732359141, c->stdev(), c->significant_digits());
+  Helper::expect_near(1147838.5, c->mean(), c->significantDigits());
+  Helper::expect_near(7005762373287.5, c->variance(), c->significantDigits());
+  Helper::expect_near(2646840.0732359141, c->stdev(), c->significantDigits());
 }
 
 } // namespace Nighthawk
