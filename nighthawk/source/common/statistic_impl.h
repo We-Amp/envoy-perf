@@ -30,7 +30,7 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-  std::unique_ptr<Statistic> combine(const Statistic& a) override;
+  std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
 
 private:
   uint64_t count_;
@@ -51,7 +51,7 @@ public:
   double mean() const override;
   double variance() const override;
   double stdev() const override;
-  std::unique_ptr<Statistic> combine(const Statistic& a) override;
+  std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
 
 private:
   std::vector<int64_t> samples_;
@@ -71,7 +71,7 @@ public:
   double variance() const override;
   double stdev() const override;
 
-  std::unique_ptr<Statistic> combine(const Statistic& a) override;
+  std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
 
   /**
    * Gets a HdrStatistic instance with corrections for coordinated omission applied.

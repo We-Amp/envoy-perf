@@ -1,14 +1,15 @@
-#include "nighthawk/source/common/statistic_impl.h"
-
-#include "nighthawk/common/statistic.h"
+#include <typeinfo> // std::bad_cast
 
 #include "gtest/gtest.h"
+
+#include "nighthawk/common/statistic.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
 
 using MyTypes = ::testing::Types<InMemoryStatistic, HdrStatistic, StreamingStatistic>;
 
-template <typename T> class StatisticTest : public testing::Test {};
+template <typename T> class TypedStatisticTest : public testing::Test {};
 
 class Helper {
 public:
@@ -33,9 +34,9 @@ private:
   Helper() = default;
 };
 
-TYPED_TEST_SUITE(StatisticTest, MyTypes);
+TYPED_TEST_SUITE(TypedStatisticTest, MyTypes);
 
-TYPED_TEST(StatisticTest, Simple) {
+TYPED_TEST(TypedStatisticTest, Simple) {
   TypeParam a;
   TypeParam b;
 
@@ -65,6 +66,20 @@ TYPED_TEST(StatisticTest, Simple) {
   Helper::expect_near(1147838.5, c->mean(), c->significantDigits());
   Helper::expect_near(7005762373287.5, c->variance(), c->significantDigits());
   Helper::expect_near(2646840.0732359141, c->stdev(), c->significantDigits());
+}
+
+class StatisticTest : public testing::Test {};
+
+TEST(StatisticTest, CombineAcrossTypesFails) {
+  HdrStatistic a;
+  InMemoryStatistic b;
+  StreamingStatistic c;
+  EXPECT_THROW(a.combine(b), std::bad_cast);
+  EXPECT_THROW(a.combine(c), std::bad_cast);
+  EXPECT_THROW(b.combine(a), std::bad_cast);
+  EXPECT_THROW(b.combine(c), std::bad_cast);
+  EXPECT_THROW(c.combine(a), std::bad_cast);
+  EXPECT_THROW(c.combine(b), std::bad_cast);
 }
 
 } // namespace Nighthawk

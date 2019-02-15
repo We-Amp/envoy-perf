@@ -47,11 +47,12 @@ public:
   /**
    * Combines two Statistics into one, and returns a new, merged, Statistic.
    * This is useful for computing results from multiple workers into a
-   * single global view.
-   * @param a The Statistic that should be combined with this instance.
+   * single global view. Types of the Statistics objects that will be combined
+   * must be the same, or else a std::bad_cast exception will be raised.
+   * @param statistic The Statistic that should be combined with this instance.
    * @return T Merged Statistic instance.
    */
-  virtual std::unique_ptr<Statistic> combine(const Statistic& a) PURE;
+  virtual std::unique_ptr<Statistic> combine(const Statistic& statistic) PURE;
 };
 
 } // namespace Nighthawk
