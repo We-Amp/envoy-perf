@@ -9,17 +9,16 @@
 namespace Nighthawk {
 
 std::string StatisticImpl::toString() const {
-  std::stringstream stream;
-  stream << fmt::format("#Completed: {}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.", count(),
-                        mean() / 1000, 2, stdev() / 1000, 2)
-         << std::endl;
-  return stream.str();
+  return fmt::format("#Completed: {}. Mean: {:.{}f}μs. Stdev: {:.{}f}μs.\n", count(), mean() / 1000,
+                     2, stdev() / 1000, 2);
 }
 
-void StatisticImpl::toProtoOutput(nighthawk::client::Output& output) {
-  output.set_request_count(count());
-  output.mutable_mean()->set_nanos(mean());
-  output.mutable_stdev()->set_nanos(stdev());
+nighthawk::client::Statistic StatisticImpl::toProto() {
+  nighthawk::client::Statistic statistic;
+  statistic.set_count(count());
+  statistic.mutable_mean()->set_nanos(mean());
+  statistic.mutable_stdev()->set_nanos(stdev());
+  return statistic;
 }
 
 StreamingStatistic::StreamingStatistic() : count_(0), mean_(0), sum_of_squares_(0) {}
@@ -79,13 +78,13 @@ std::unique_ptr<Statistic> InMemoryStatistic::combine(const Statistic& statistic
   return combined;
 }
 
-const int HdrStatistic::SIGNIFICANT_DIGITS = 4;
+const int HdrStatistic::SignificantDigits = 4;
 
 HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   // Upper bound of 60 seconds (tracking in nanoseconds).
   const uint64_t max_latency = 1000L * 1000 * 1000 * 60;
 
-  int status = hdr_init(1 /* min trackable value */, max_latency, HdrStatistic::SIGNIFICANT_DIGITS,
+  int status = hdr_init(1 /* min trackable value */, max_latency, HdrStatistic::SignificantDigits,
                         &histogram_);
   if (status != 0) {
     ENVOY_LOG(error, "Failed to initialize HdrHistogram.");
@@ -103,6 +102,8 @@ HdrStatistic::~HdrStatistic() {
 
 void HdrStatistic::addValue(int64_t value) {
   if (histogram_ != nullptr) {
+    // Failure to record a value can happen when it exceeds the configured minimum
+    // or maximum value we passed when initializing histogram_.
     if (!hdr_record_value(histogram_, value)) {
       ENVOY_LOG(warn, "Failed to record value into HdrHistogram.");
     }
@@ -150,6 +151,8 @@ std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) {
     return combined;
   }
 
+  // Dropping a value can happen when it exceeds the configured minimum
+  // or maximum value we passed when initializing histogram_.
   int dropped;
   dropped = hdr_add(combined->histogram_, this->histogram_);
   dropped += hdr_add(combined->histogram_, b.histogram_);
@@ -157,20 +160,6 @@ std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) {
     ENVOY_LOG(warn, "Combining HdrHistograms dropped values.");
   }
   return combined;
-}
-
-std::unique_ptr<HdrStatistic> HdrStatistic::getCorrected(const Frequency& frequency) {
-  auto h = std::make_unique<HdrStatistic>();
-  if (this->histogram_ == nullptr) {
-    return h;
-  }
-  int dropped = hdr_add_while_correcting_for_coordinated_omission(
-      h->histogram_, this->histogram_,
-      std::chrono::duration_cast<std::chrono::nanoseconds>(frequency.interval()).count());
-  if (dropped > 0) {
-    ENVOY_LOG(warn, "Dropped values while getting the corrected HdrStatistics.");
-  }
-  return h;
 }
 
 std::string HdrStatistic::toString() const {
@@ -186,8 +175,8 @@ std::string HdrStatistic::toString() const {
 
   std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
   for (uint64_t i = 0; i < percentiles.size(); i++) {
-    double p = percentiles[i];
-    int64_t n = hdr_value_at_percentile(histogram_, p);
+    const double p = percentiles[i];
+    const int64_t n = hdr_value_at_percentile(histogram_, p);
 
     // We scale from nanoseconds to microseconds in the output.
     stream << fmt::format("{:>12}% {:>14}", p, n / 1000.0) << std::endl;
@@ -195,8 +184,8 @@ std::string HdrStatistic::toString() const {
   return stream.str();
 }
 
-void HdrStatistic::toProtoOutput(nighthawk::client::Output& output) {
-  StatisticImpl::toProtoOutput(output);
+nighthawk::client::Statistic HdrStatistic::toProto() {
+  nighthawk::client::Statistic proto = StatisticImpl::toProto();
 
   struct hdr_iter iter;
   struct hdr_iter_percentiles* percentiles;
@@ -206,11 +195,13 @@ void HdrStatistic::toProtoOutput(nighthawk::client::Output& output) {
   while (hdr_iter_next(&iter)) {
     nighthawk::client::Percentile* percentile;
 
-    percentile = output.add_latency_percentiles();
-    percentile->mutable_latency()->set_nanos(iter.highest_equivalent_value);
+    percentile = proto.add_percentiles();
+    percentile->mutable_duration()->set_nanos(iter.highest_equivalent_value);
     percentile->set_percentile(percentiles->percentile / 100.0);
     percentile->set_count(iter.cumulative_count);
   }
+
+  return proto;
 }
 
 } // namespace Nighthawk

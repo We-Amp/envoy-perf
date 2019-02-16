@@ -104,7 +104,8 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  merged_statistics->toProtoOutput(output);
+  nighthawk::client::Statistic* latency_statistic = output.mutable_latency();
+  *latency_statistic = merged_statistics->toProto();
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;
