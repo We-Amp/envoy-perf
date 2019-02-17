@@ -65,12 +65,12 @@ void WorkerImpl::work() {
   sequencer_->waitForCompletion();
 
   ENVOY_LOG(info,
-            "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. Stdev: "
+            "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. pstdev: "
             "{:.{}f}μs. "
             "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
             "resets: {}. ",
             worker_number_, sequencer_->completions_per_second(), 2, statistic().mean() / 1000, 2,
-            statistic().stdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
+            statistic().pstdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
             store_->counter("nighthawk.upstream_cx_connect_fail").value(),
             client_->pool_overflow_failures(), client_->http_good_response_count(),
             client_->http_bad_response_count(), client_->stream_reset_count());
