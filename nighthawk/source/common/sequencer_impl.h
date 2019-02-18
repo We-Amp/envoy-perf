@@ -36,6 +36,9 @@ public:
   const HdrStatistic& blocked_statistic() { return blocked_statistic_; }
   const HdrStatistic& latency_statistic() { return latency_statistic_; }
 
+  // Spinning makes tests hang when simulated time is used.
+  void disable_idle_spin_for_tests() { spin_when_idle_ = false; }
+
 protected:
   void run(bool from_timer);
   void scheduleRun();
@@ -57,6 +60,7 @@ private:
   Envoy::MonotonicTime start_;
   uint64_t targets_initiated_;
   uint64_t targets_completed_;
+  bool spin_when_idle_;
 };
 
 } // namespace Nighthawk

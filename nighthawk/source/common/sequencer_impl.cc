@@ -16,7 +16,8 @@ SequencerImpl::SequencerImpl(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSo
                              std::chrono::microseconds grace_timeout)
     : dispatcher_(dispatcher), time_source_(time_source), rate_limiter_(rate_limiter),
       target_(target), duration_(duration), grace_timeout_(grace_timeout),
-      start_(time_source.monotonicTime().min()), targets_initiated_(0), targets_completed_(0) {
+      start_(time_source.monotonicTime().min()), targets_initiated_(0), targets_completed_(0),
+      spin_when_idle_(true) {
   if (target_ == nullptr) {
     throw NighthawkException("SequencerImpl must be constructed with a SequencerTarget.");
   }
@@ -90,7 +91,7 @@ void SequencerImpl::run(bool from_timer) {
   }
 
   if (!from_timer) {
-    if (targets_initiated_ == targets_completed_) {
+    if (spin_when_idle_ && targets_initiated_ == targets_completed_) {
       // TODO(oschaaf): Ideally we would have much finer grained timers instead.
       // TODO(oschaaf): Optionize performing this spin loop.
       // We saturated the rate limiter, and there's no outstanding work.

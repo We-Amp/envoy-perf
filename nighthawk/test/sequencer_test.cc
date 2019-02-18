@@ -2,8 +2,7 @@
 
 #include "gtest/gtest.h"
 
-//#include "test/test_common/simulated_time_system.h"
-#include "common/event/real_time_system.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/thread_impl.h"
@@ -23,41 +22,78 @@ class SequencerTest : public testing::Test {
 public:
   SequencerTest()
       : api_(1000ms /*flush interval*/, thread_factory_, store_, time_system_),
-        dispatcher_(api_.allocateDispatcher()), callback_test_count_(0) {}
+        dispatcher_(api_.allocateDispatcher()), callback_test_count_(0), frequency_(10_Hz),
+        interval_(std::chrono::duration_cast<std::chrono::milliseconds>(frequency_.interval())),
+        times_(5), rate_limiter_(time_system_, frequency_),
+        sequencer_target_(std::bind(&SequencerTest::callback_test, this, std::placeholders::_1)),
+        clock_updates_(0) {}
+
+  void updateClock() {
+    time_system_.setMonotonicTime((clock_updates_ * interval_) + interval_);
+    clock_updates_++;
+  }
 
   bool callback_test(std::function<void()> f) {
     callback_test_count_++;
     f();
     return true;
   }
-
-  void SetUp() { /*time_system_.setMonotonicTime(0s);*/
+  bool timeout_test(std::function<void()> /* f */) {
+    callback_test_count_++;
+    // We don't call f(); which will cause the sequencer to think
+    // there's outstanding work.
+    return true;
   }
-  void TearDown() {}
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
   Envoy::Stats::IsolatedStoreImpl store_;
-
-  // Simulated time broke when we introduced the spin loop.
-  // Figure that out at some point and restore simulated
-  // time usage here.
-  // Envoy::Event::SimulatedTimeSystem time_system_;
-  Envoy::Event::RealTimeSystem time_system_;
+  Envoy::Event::SimulatedTimeSystem time_system_;
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   int callback_test_count_;
+  const Frequency frequency_;
+  const std::chrono::milliseconds interval_;
+  const uint64_t times_;
+  LinearRateLimiter rate_limiter_;
+  SequencerTarget sequencer_target_;
+  uint64_t clock_updates_;
 };
 
 TEST_F(SequencerTest, BasicTest) {
-  LinearRateLimiter rate_limiter(time_system_, 10_Hz);
-  SequencerTarget f = std::bind(&SequencerTest::callback_test, this, std::placeholders::_1);
-
-  SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter, f, 1050ms, 1s);
+  SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter_, sequencer_target_,
+                          times_ * interval_ /* Sequencer run time.*/,
+                          1ms /* Sequencer timeout. */);
+  // With simulated time, this test will hang when spinning is allowed.
+  sequencer.disable_idle_spin_for_tests();
   sequencer.start();
-  // time_system_.setMonotonicTime(1s);
+
+  for (uint64_t i = 0; i < times_; i++) {
+    updateClock();
+  }
+
   sequencer.waitForCompletion();
-  // We ought to have observed 10 callbacks at the 10/second pacing.
-  EXPECT_EQ(10, callback_test_count_);
+  EXPECT_EQ(times_, callback_test_count_);
+  EXPECT_EQ(times_, sequencer.latency_statistic().count());
+}
+
+TEST_F(SequencerTest, TimeoutTest) {
+  SequencerTarget callback = std::bind(&SequencerTest::timeout_test, this, std::placeholders::_1);
+  SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter_, callback,
+                          times_ * interval_ /* Sequencer run time.*/,
+                          1ms /* Sequencer timeout. */);
+  sequencer.disable_idle_spin_for_tests();
+  sequencer.start();
+
+  for (uint64_t i = 0; i < times_; i++) {
+    updateClock();
+  }
+
+  sequencer.waitForCompletion();
+  // The test is actually that we get here. We would hang
+  // if the timeout didn't work. In any case, the test should have seen the callback...
+  EXPECT_EQ(5, callback_test_count_);
+  // ... but they ought to have not arrived at the Sequencer.
+  EXPECT_EQ(0, sequencer.latency_statistic().count());
 }
 
 TEST_F(SequencerTest, EmptyCallbackThrowsTest) {
