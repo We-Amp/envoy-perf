@@ -8,17 +8,19 @@
 #include "envoy/runtime/runtime.h"
 
 #include "nighthawk/common/rate_limiter.h"
+#include "nighthawk/common/sequencer.h"
+
 #include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
 
 using SequencerTarget = std::function<bool(std::function<void()>)>;
 
-class Sequencer : public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+class SequencerImpl : public Sequencer, public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  Sequencer(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,
-            RateLimiter& rate_limiter, SequencerTarget& target, std::chrono::microseconds duration,
-            std::chrono::microseconds grace_timeout);
+  SequencerImpl(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,
+                RateLimiter& rate_limiter, SequencerTarget& target,
+                std::chrono::microseconds duration, std::chrono::microseconds grace_timeout);
   void start();
   void waitForCompletion();
 
@@ -40,7 +42,7 @@ protected:
   void stop();
 
 private:
-  static const std::chrono::milliseconds ENVOY_TIMER_MIN_RES;
+  static const std::chrono::milliseconds EnvoyTimerMinResolution;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
   HdrStatistic blocked_statistic_;

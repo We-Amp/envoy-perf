@@ -58,8 +58,8 @@ void WorkerImpl::work() {
   LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
   SequencerTarget f =
       std::bind(&BenchmarkHttpClient::tryStartOne, client_.get(), std::placeholders::_1);
-  sequencer_.reset(new Sequencer(*dispatcher_, time_system_, rate_limiter, f, options_.duration(),
-                                 options_.timeout()));
+  sequencer_.reset(new SequencerImpl(*dispatcher_, time_system_, rate_limiter, f,
+                                     options_.duration(), options_.timeout()));
 
   sequencer_->start();
   sequencer_->waitForCompletion();

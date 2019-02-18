@@ -13,7 +13,7 @@
 #include "nighthawk/common/exception.h"
 
 #include "nighthawk/source/common/rate_limiter_impl.h"
-#include "nighthawk/source/common/sequencer.h"
+#include "nighthawk/source/common/sequencer_impl.h"
 
 using namespace std::chrono_literals;
 
@@ -52,7 +52,7 @@ TEST_F(SequencerTest, BasicTest) {
   LinearRateLimiter rate_limiter(time_system_, 10_Hz);
   SequencerTarget f = std::bind(&SequencerTest::callback_test, this, std::placeholders::_1);
 
-  Sequencer sequencer(*dispatcher_, time_system_, rate_limiter, f, 1050ms, 1s);
+  SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter, f, 1050ms, 1s);
   sequencer.start();
   // time_system_.setMonotonicTime(1s);
   sequencer.waitForCompletion();
@@ -65,7 +65,7 @@ TEST_F(SequencerTest, EmptyCallbackThrowsTest) {
   SequencerTarget callback_empty;
 
   ASSERT_THROW(
-      Sequencer sequencer(*dispatcher_, time_system_, rate_limiter, callback_empty, 1s, 1s),
+      SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter, callback_empty, 1s, 1s),
       NighthawkException);
 }
 

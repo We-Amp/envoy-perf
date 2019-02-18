@@ -9,7 +9,7 @@ envoy_cc_library(
     name = "nighthawk_common_lib",
     srcs = [
         "rate_limiter_impl.cc",
-        "sequencer.cc",
+        "sequencer_impl.cc",
         "statistic_impl.cc",
         "stream_decoder.cc",
         "utility.cc",
@@ -17,7 +17,7 @@ envoy_cc_library(
     hdrs = [
         "frequency.h",
         "rate_limiter_impl.h",
-        "sequencer.h",
+        "sequencer_impl.h",
         "ssl.h",
         "statistic_impl.h",
         "stream_decoder.h",

@@ -32,11 +32,7 @@ void StreamDecoder::onComplete(bool success) {
   delete this;
 }
 
-void StreamDecoder::onResetStream(Envoy::Http::StreamResetReason) {
-  // TODO(oschaaf): check if we need to do something here.
-  // ADD_FAILURE();
-  onComplete(false);
-}
+void StreamDecoder::onResetStream(Envoy::Http::StreamResetReason) { onComplete(false); }
 
 } // namespace Http
 } // namespace Nighthawk
