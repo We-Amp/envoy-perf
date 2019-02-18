@@ -16,12 +16,39 @@ std::string StatisticImpl::toString() const {
 nighthawk::client::Statistic StatisticImpl::toProto() {
   nighthawk::client::Statistic statistic;
   statistic.set_count(count());
-  statistic.mutable_mean()->set_nanos(mean());
-  statistic.mutable_pstdev()->set_nanos(pstdev());
+  statistic.mutable_mean()->set_nanos(std::round(mean()));
+  statistic.mutable_pstdev()->set_nanos(std::round(pstdev()));
   return statistic;
 }
 
-StreamingStatistic::StreamingStatistic() : count_(0), mean_(0), sum_of_squares_(0) {}
+SimpleStatistic::SimpleStatistic() : count_(0), sum_x_(0), sum_x2_(0) {}
+
+void SimpleStatistic::addValue(int64_t value) {
+  count_++;
+  sum_x_ += value;
+  sum_x2_ += value * value;
+}
+
+uint64_t SimpleStatistic::count() const { return count_; }
+
+double SimpleStatistic::mean() const { return count_ == 0 ? std::nan("") : sum_x_ / count_; }
+
+double SimpleStatistic::pvariance() const { return (sum_x2_ / count_) - (mean() * mean()); }
+
+double SimpleStatistic::pstdev() const { return sqrt(pvariance()); }
+
+std::unique_ptr<Statistic> SimpleStatistic::combine(const Statistic& statistic) {
+  const SimpleStatistic& a = *this;
+  const SimpleStatistic& b = dynamic_cast<const SimpleStatistic&>(statistic);
+  auto combined = std::make_unique<SimpleStatistic>();
+
+  combined->count_ = a.count() + b.count();
+  combined->sum_x_ = a.sum_x_ + b.sum_x_;
+  combined->sum_x2_ = a.sum_x2_ + b.sum_x2_;
+  return combined;
+}
+
+StreamingStatistic::StreamingStatistic() : count_(0), mean_(0), accumulated_variance_(0) {}
 
 void StreamingStatistic::addValue(int64_t value) {
   double delta, delta_n;
@@ -29,14 +56,14 @@ void StreamingStatistic::addValue(int64_t value) {
   delta = value - mean_;
   delta_n = delta / count_;
   mean_ += delta_n;
-  sum_of_squares_ += delta * delta_n * (count_ - 1);
+  accumulated_variance_ += delta * delta_n * (count_ - 1);
 }
 
 uint64_t StreamingStatistic::count() const { return count_; }
 
-double StreamingStatistic::mean() const { return mean_; }
+double StreamingStatistic::mean() const { return count_ == 0 ? std::nan("") : mean_; }
 
-double StreamingStatistic::pvariance() const { return sum_of_squares_ / count_; }
+double StreamingStatistic::pvariance() const { return accumulated_variance_ / count_; }
 
 double StreamingStatistic::pstdev() const { return sqrt(pvariance()); }
 
@@ -47,8 +74,8 @@ std::unique_ptr<Statistic> StreamingStatistic::combine(const Statistic& statisti
 
   combined->count_ = a.count() + b.count();
   combined->mean_ = ((a.count() * a.mean()) + (b.count() * b.mean())) / combined->count_;
-  combined->sum_of_squares_ =
-      a.sum_of_squares_ + b.sum_of_squares_ +
+  combined->accumulated_variance_ =
+      a.accumulated_variance_ + b.accumulated_variance_ +
       pow(a.mean() - b.mean(), 2) * a.count() * b.count() / combined->count();
   return combined;
 }
@@ -87,49 +114,36 @@ HdrStatistic::HdrStatistic() : histogram_(nullptr) {
   int status = hdr_init(1 /* min trackable value */, max_latency, HdrStatistic::SignificantDigits,
                         &histogram_);
   if (status != 0) {
-    ENVOY_LOG(error, "Failed to initialize HdrHistogram.");
-    histogram_ = nullptr;
+    ENVOY_LOG(error, "Failed to initialize HdrHistogram: {}.", status);
+    throw StatisticException();
   }
+
+  ASSERT(histogram_ != nullptr);
 }
 
 // TODO(oschaaf): valgrind complains when a Histogram is created but never used.
 HdrStatistic::~HdrStatistic() {
-  if (histogram_ != nullptr) {
-    hdr_close(histogram_);
-    histogram_ = nullptr;
-  }
+  ASSERT(histogram_ != nullptr);
+  hdr_close(histogram_);
+  histogram_ = nullptr;
 }
 
 void HdrStatistic::addValue(int64_t value) {
-  if (histogram_ != nullptr) {
-    // Failure to record a value can happen when it exceeds the configured minimum
-    // or maximum value we passed when initializing histogram_.
-    if (!hdr_record_value(histogram_, value)) {
-      ENVOY_LOG(warn, "Failed to record value into HdrHistogram.");
-    }
+  // Failure to record a value can happen when it exceeds the configured minimum
+  // or maximum value we passed when initializing histogram_.
+  if (!hdr_record_value(histogram_, value)) {
+    ENVOY_LOG(warn, "Failed to record value into HdrHistogram.");
   }
 }
 
 uint64_t HdrStatistic::count() const { return histogram_->total_count; }
 double HdrStatistic::mean() const { return hdr_mean(histogram_); }
-double HdrStatistic::pvariance() const {
-  return pstdev() * pstdev();
-  ;
-}
-double HdrStatistic::pstdev() const {
-  if (histogram_ == nullptr) {
-    return 0;
-  }
-  return hdr_stddev(histogram_);
-}
+double HdrStatistic::pvariance() const { return pstdev() * pstdev(); }
+double HdrStatistic::pstdev() const { return hdr_stddev(histogram_); }
 
 std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) {
   auto combined = std::make_unique<HdrStatistic>();
   const HdrStatistic& b = dynamic_cast<const HdrStatistic&>(statistic);
-
-  if (this->histogram_ == nullptr || b.histogram_ == nullptr) {
-    return combined;
-  }
 
   // Dropping a value can happen when it exceeds the configured minimum
   // or maximum value we passed when initializing histogram_.
@@ -144,13 +158,8 @@ std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) {
 
 std::string HdrStatistic::toString() const {
   std::stringstream stream;
+
   stream << StatisticImpl::toString();
-
-  if (histogram_ == nullptr) {
-    ENVOY_LOG(warn, "HdrHistogram latencies could not be printed.");
-    return stream.str();
-  }
-
   stream << fmt::format("{:>12} {:>14} (us)", "Percentile", "Latency") << std::endl;
 
   std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};

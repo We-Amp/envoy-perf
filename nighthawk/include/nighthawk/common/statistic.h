@@ -5,11 +5,17 @@
 #include <string>
 
 #include "common/common/non_copyable.h"
+#include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 
 #include "nighthawk/source/client/output.pb.h"
 
 namespace Nighthawk {
+
+class StatisticException : public Envoy::EnvoyException {
+public:
+  StatisticException() : Envoy::EnvoyException("StatisticException") {}
+};
 
 /**
  * Abstract interface for a statistic.
@@ -33,6 +39,13 @@ public:
    * @return Number of significant digits. 0 is assumed to be max precision.
    */
   virtual uint64_t significantDigits() const { return 0; }
+
+  /**
+   * Indicates if the implementation is subject to catastrophic cancellation.
+   * Used in tests.
+   * @return True iff catastrophic cancellation should not occur.
+   */
+  virtual bool resistsCatastrophicCancellation() const { return false; }
 
   /**
    * Gets a representation of the statistic as a std::string.

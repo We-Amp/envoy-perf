@@ -1,13 +1,19 @@
+#include <fstream>
+#include <iostream>
+#include <random>
 #include <typeinfo> // std::bad_cast
 
 #include "gtest/gtest.h"
+
+#include <google/protobuf/util/json_util.h>
 
 #include "nighthawk/common/statistic.h"
 #include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
 
-using MyTypes = ::testing::Types<InMemoryStatistic, HdrStatistic, StreamingStatistic>;
+using MyTypes =
+    ::testing::Types<SimpleStatistic, InMemoryStatistic, HdrStatistic, StreamingStatistic>;
 
 template <typename T> class TypedStatisticTest : public testing::Test {};
 
@@ -65,7 +71,118 @@ TYPED_TEST(TypedStatisticTest, Simple) {
   Helper::expectNear(2416223.357033227, c->pstdev(), c->significantDigits());
 }
 
+TYPED_TEST(TypedStatisticTest, Empty) {
+  TypeParam a;
+  EXPECT_EQ(0, a.count());
+  EXPECT_TRUE(std::isnan(a.mean()));
+  EXPECT_TRUE(std::isnan(a.pvariance()));
+  EXPECT_TRUE(std::isnan(a.pstdev()));
+}
+
+TYPED_TEST(TypedStatisticTest, SingleAndDoubleValue) {
+  TypeParam a;
+
+  a.addValue(1);
+  EXPECT_EQ(1, a.count());
+  EXPECT_DOUBLE_EQ(1, a.mean());
+  EXPECT_DOUBLE_EQ(0, a.pvariance());
+  EXPECT_DOUBLE_EQ(0, a.pstdev());
+
+  a.addValue(2);
+  EXPECT_EQ(2, a.count());
+  EXPECT_DOUBLE_EQ(1.5, a.mean());
+  EXPECT_DOUBLE_EQ(0.25, a.pvariance());
+  EXPECT_DOUBLE_EQ(0.5, a.pstdev());
+}
+
+TYPED_TEST(TypedStatisticTest, CatastrophicalCancellation) {
+  // From https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance
+  // Assume that all floating point operations use standard IEEE 754 double-precision arithmetic.
+  // Consider the sample (4, 7, 13, 16) from an infinite population. Based on this sample, the
+  // estimated population mean is 10, and the unbiased estimate of population variance is 30. Both
+  // the naïve algorithm and two-pass algorithm compute these values correctly.
+  // Next consider the sample (108 + 4, 108 + 7, 108 + 13, 108 + 16), which gives rise to the same
+  // estimated variance as the first sample. The two-pass algorithm computes this variance estimate
+  // correctly, but the naïve algorithm returns 29.333333333333332 instead of 30. While this loss of
+  // precision may be tolerable and viewed as a minor flaw of the naïve algorithm, further
+  // increasing the offset makes the error catastrophic. Consider the sample (109 + 4, 109 + 7, 109
+  // + 13, 109 + 16). Again the estimated population variance of 30 is computed correctly by the
+  // two-pass algorithm, but the naïve algorithm now computes it as −170.66666666666666. This is a
+  // serious problem with naïve algorithm and is due to catastrophic cancellation in the subtraction
+  // of two similar numbers at the final stage of the algorithm.
+  std::vector<int> values{4, 7, 13, 16};
+  int exponential = 0;
+  for (exponential = 3; exponential < 16; exponential++) {
+    TypeParam a;
+    double offset = std::pow(10, exponential);
+    for (int value : values) {
+      a.addValue(offset + value);
+    }
+    // If an implementation makes this claim, we put it to the test. SimpleStatistic is simple and
+    // fast, but starts failing this test when exponential equals 8. HdrStatistic breaks at 5.
+    // TODO(oschaaf): evaluate ^^
+    if (a.resistsCatastrophicCancellation()) {
+      Helper::expectNear(22.5, a.pvariance(), a.significantDigits());
+      Helper::expectNear(4.7434164902525691, a.pstdev(), a.significantDigits());
+    }
+  }
+}
+
+TYPED_TEST(TypedStatisticTest, OneMillionRandomSamples) {
+  std::random_device rd;
+  std::mt19937 mt(rd());
+  // TODO(oschaaf): Actually the range we want to test is a factor 1000 higher, but
+  // then catastrophical cancellation make SimpleStatistic fail expectations.
+  // For now, we use values that shouldn't trigger the phenomena. Revisit this later.
+  std::uniform_real_distribution<double> dist(1ULL, 1000ULL * 1000 * 60);
+
+  StreamingStatistic referenceStatistic;
+  TypeParam testStatistic;
+  for (int i = 0; i < 999999; ++i) {
+    auto value = dist(mt);
+    referenceStatistic.addValue(value);
+    testStatistic.addValue(value);
+  }
+  Helper::expectNear(referenceStatistic.mean(), testStatistic.mean(),
+                     testStatistic.significantDigits());
+  Helper::expectNear(referenceStatistic.pvariance(), testStatistic.pvariance(),
+                     testStatistic.significantDigits());
+  Helper::expectNear(referenceStatistic.pstdev(), testStatistic.pstdev(),
+                     testStatistic.significantDigits());
+}
+
+TYPED_TEST(TypedStatisticTest, ProtoOutput) {
+  TypeParam a;
+
+  a.addValue(6543456);
+  a.addValue(342335);
+
+  const nighthawk::client::Statistic proto = a.toProto();
+
+  EXPECT_EQ(proto.count(), 2);
+  EXPECT_EQ(proto.mean().nanos(), std::round(a.mean()));
+  EXPECT_EQ(proto.pstdev().nanos(), std::round(a.pstdev()));
+}
+
 class StatisticTest : public testing::Test {};
+
+TEST(StatisticTest, HdrStatisticPercentilesProto) {
+  HdrStatistic statistic;
+  int max = 10;
+
+  for (int i = 1; i <= max; i++) {
+    statistic.addValue(i);
+  }
+
+  std::string str;
+  google::protobuf::util::JsonPrintOptions options;
+  google::protobuf::util::MessageToJsonString(statistic.toProto(), &str, options);
+  std::ifstream myfile;
+  myfile.open("nighthawk/test/hdr_proto_json.gold");
+  std::string gold;
+  myfile >> gold;
+  EXPECT_EQ(gold, str);
+}
 
 TEST(StatisticTest, CombineAcrossTypesFails) {
   HdrStatistic a;

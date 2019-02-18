@@ -20,7 +20,29 @@ public:
 
 /**
  * Simple statistic that keeps track of count/mean/pvariance/pstdev with low memory
- * requirements.
+ * requirements, but the potential for errors due to catastrophic cancellation.
+ */
+class SimpleStatistic : public StatisticImpl {
+public:
+  SimpleStatistic();
+  void addValue(int64_t value) override;
+  uint64_t count() const override;
+  double mean() const override;
+  double pvariance() const override;
+  double pstdev() const override;
+  std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
+  uint64_t significantDigits() const override { return 8; }
+
+private:
+  uint64_t count_;
+  double sum_x_;
+  double sum_x2_;
+};
+
+/**
+ * Statistic that keeps track of count/mean/pvariance/pstdev with low memory
+ * requirements. Resistant to catastrophic cancellation and pretty accurate.
+ * Based on Donald Knuth's online variance computation algorithm.
  */
 class StreamingStatistic : public StatisticImpl {
 public:
@@ -31,11 +53,12 @@ public:
   double pvariance() const override;
   double pstdev() const override;
   std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
+  bool resistsCatastrophicCancellation() const override { return true; }
 
 private:
   uint64_t count_;
   double mean_;
-  double sum_of_squares_;
+  double accumulated_variance_;
 };
 
 /**
@@ -52,6 +75,10 @@ public:
   double pvariance() const override;
   double pstdev() const override;
   std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
+  bool resistsCatastrophicCancellation() const override {
+    return streaming_stats_->resistsCatastrophicCancellation();
+  }
+  uint64_t significantDigits() const override { return streaming_stats_->significantDigits(); }
 
 private:
   std::vector<int64_t> samples_;
@@ -74,7 +101,7 @@ public:
   std::unique_ptr<Statistic> combine(const Statistic& statistic) override;
   std::string toString() const override;
   nighthawk::client::Statistic toProto() override;
-  virtual uint64_t significantDigits() const override { return SignificantDigits; }
+  uint64_t significantDigits() const override { return SignificantDigits; }
 
 private:
   static const int SignificantDigits;
