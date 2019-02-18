@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "nighthawk/source/common/statistic_impl.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -26,12 +26,11 @@ public:
    */
   virtual void waitForCompletion() PURE;
 
-  // TODO(oschaaf): Stop exposing the implementation of statistic here.
   /**
    * Get the latency statistics. Only to be called after waitForCompletion().
-   * @return const HdrStatistic&
+   * @return const Statistic&
    */
-  virtual const HdrStatistic& statistic() PURE;
+  virtual const Statistic& statistic() PURE;
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;

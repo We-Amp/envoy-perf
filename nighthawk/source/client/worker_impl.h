@@ -16,12 +16,12 @@ namespace Client {
 
 class WorkerImpl : Worker, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
-             int worker_number);
+  WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, const Options& options,
+             const int worker_number);
 
   void start() override;
   void waitForCompletion() override;
-  const HdrStatistic& statistic() override;
+  const Statistic& statistic() override;
 
 private:
   void work();
@@ -31,8 +31,8 @@ private:
   std::unique_ptr<Sequencer> sequencer_;
   Envoy::Thread::ThreadFactoryImplPosix& thread_factory_;
   Envoy::Thread::ThreadPtr thread_;
-  int worker_number_;
-  Options& options_;
+  const int worker_number_;
+  const Options& options_;
   bool started_;
   bool completed_;
 };

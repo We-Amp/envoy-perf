@@ -12,8 +12,8 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-WorkerImpl::WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, Options& options,
-                       int worker_number)
+WorkerImpl::WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory,
+                       const Options& options, const int worker_number)
     : thread_factory_(thread_factory), worker_number_(worker_number), options_(options),
       started_(false), completed_(false) {}
 
@@ -86,7 +86,7 @@ void WorkerImpl::waitForCompletion() {
   thread_->join();
 }
 
-const HdrStatistic& WorkerImpl::statistic() {
+const Statistic& WorkerImpl::statistic() {
   ASSERT(started_ && completed_);
   return sequencer_->latency_statistic();
 }
