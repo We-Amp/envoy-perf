@@ -1,5 +1,4 @@
-#include <fstream>
-#include <iostream>
+#include <chrono>
 #include <random>
 #include <typeinfo> // std::bad_cast
 
@@ -7,8 +6,17 @@
 
 #include <google/protobuf/util/json_util.h>
 
+#include "common/filesystem/filesystem_impl.h"
+#include "common/protobuf/utility.h"
+#include "common/stats/isolated_store_impl.h"
+
+#include "test/test_common/utility.h"
+
 #include "nighthawk/common/statistic.h"
 #include "nighthawk/source/common/statistic_impl.h"
+#include "nighthawk/test/test_common/environment.h"
+
+using namespace std::chrono_literals;
 
 namespace Nighthawk {
 
@@ -129,17 +137,21 @@ TYPED_TEST(TypedStatisticTest, CatastrophicalCancellation) {
 }
 
 TYPED_TEST(TypedStatisticTest, OneMillionRandomSamples) {
-  std::random_device rd;
-  std::mt19937 mt(rd());
+  std::mt19937_64 mt(1243);
   // TODO(oschaaf): Actually the range we want to test is a factor 1000 higher, but
   // then catastrophical cancellation make SimpleStatistic fail expectations.
   // For now, we use values that shouldn't trigger the phenomena. Revisit this later.
   std::uniform_real_distribution<double> dist(1ULL, 1000ULL * 1000 * 60);
-
   StreamingStatistic referenceStatistic;
   TypeParam testStatistic;
+
   for (int i = 0; i < 999999; ++i) {
     auto value = dist(mt);
+
+    // Small selftest that we generate a deterministic set in this test.
+    if (i == 10000) {
+      EXPECT_DOUBLE_EQ(13944017.313468568, value);
+    }
     referenceStatistic.addValue(value);
     testStatistic.addValue(value);
   }
@@ -167,21 +179,21 @@ TYPED_TEST(TypedStatisticTest, ProtoOutput) {
 class StatisticTest : public testing::Test {};
 
 TEST(StatisticTest, HdrStatisticPercentilesProto) {
+  Envoy::Thread::ThreadFactory& thread_factory = Envoy::Thread::threadFactoryForTest();
+  Envoy::Stats::IsolatedStoreImpl store;
+  Envoy::Filesystem::InstanceImpl filesystem(100ms, thread_factory, store);
+  nighthawk::client::Statistic parsed_json_proto;
   HdrStatistic statistic;
-  int max = 10;
 
-  for (int i = 1; i <= max; i++) {
+  for (int i = 1; i <= 10; i++) {
     statistic.addValue(i);
   }
 
-  std::string str;
-  google::protobuf::util::JsonPrintOptions options;
-  google::protobuf::util::MessageToJsonString(statistic.toProto(), &str, options);
-  std::ifstream myfile;
-  myfile.open("nighthawk/test/hdr_proto_json.gold");
-  std::string gold;
-  myfile >> gold;
-  EXPECT_EQ(gold, str);
+  Envoy::MessageUtil util;
+  util.loadFromJson(filesystem.fileReadToEnd(TestEnvironment::runfilesPath(
+                        "nighthawk/test/test_data/hdr_proto_json.gold")),
+                    parsed_json_proto);
+  EXPECT_TRUE(util(parsed_json_proto, statistic.toProto()));
 }
 
 TEST(StatisticTest, CombineAcrossTypesFails) {

@@ -18,13 +18,18 @@ envoy_cc_test(
     ],
     data = [
         "certs.sh",
-        "hdr_proto_json.gold",
         "lorem_ipsum.txt",
+        "test_data/hdr_proto_json.gold",
     ],
     repository = "@envoy",
     deps = [
         "//nighthawk/source/client:nighthawk_client_lib",
+        "//nighthawk/test/test_common:environment_lib",
+        "@envoy//source/common/filesystem:filesystem_lib",
+        "@envoy//source/common/protobuf:utility_lib",
+        "@envoy//source/common/stats:isolated_store_lib",
         "@envoy//test/integration:integration_lib",
         "@envoy//test/server:utility_lib",
+        "@envoy//test/test_common:simulated_time_system_lib",
     ],
 )
