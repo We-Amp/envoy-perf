@@ -4,13 +4,10 @@
 
 #include "gtest/gtest.h"
 
-#include "test/test_common/simulated_time_system.h"
-
 #include "common/api/api_impl.h"
 #include "common/common/compiler_requirements.h"
 #include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
-#include "common/event/real_time_system.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -37,10 +34,10 @@ class BenchmarkClientTest : public Envoy::BaseIntegrationTest,
 public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
+        time_system_(timeSystem()),
         api_(1000ms /*flush interval*/, thread_factory_, store_, time_system_),
         dispatcher_(api_.allocateDispatcher()), runtime_(generator_, store_, tls_) {}
 
-  // Called once by the gtest framework before any BenchmarkClientTest are run.
   static void SetUpTestCase() {
     // TODO(oschaaf): ask around how we should do this.
     Envoy::TestEnvironment::setEnvVar("TEST_TMPDIR", Envoy::TestEnvironment::temporaryDirectory(),
@@ -175,7 +172,7 @@ static_resources:
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
   Envoy::Stats::IsolatedStoreImpl store_;
-  Envoy::Event::RealTimeSystem time_system_;
+  Envoy::Event::TimeSystem& time_system_;
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
@@ -271,8 +268,8 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithoutRequestQueue) {
   EXPECT_EQ(1, client.http_good_response_count());
 }
 
-// TODO(oschaaf): figure out if we can use simulated time in this test
-// to eliminate flake chances, and speed up execution.
+// TODO(oschaaf): figure out if we can use simulated time in this test to eliminate flake chances,
+// and speed up execution.
 TEST_P(BenchmarkClientTest, SequencedH2Test) {
   Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
   request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);

@@ -42,27 +42,6 @@ const std::string DEFAULT_ECDH_CURVES =
 #endif
     "P-256";
 
-namespace {
-// This SslSocket will be used when SSL secret is not fetched from SDS server.
-class MNotReadySslSocket : public Envoy::Network::TransportSocket {
-public:
-  // Network::TransportSocket
-  void setTransportSocketCallbacks(Envoy::Network::TransportSocketCallbacks&) override {}
-  std::string protocol() const override { return Envoy::EMPTY_STRING; }
-  bool canFlushClose() override { return true; }
-  void closeSocket(Envoy::Network::ConnectionEvent) override {}
-  Envoy::Network::IoResult doRead(Envoy::Buffer::Instance&) override {
-    return {Envoy::Network::PostIoAction::Close, 0, false};
-  }
-  Envoy::Network::IoResult doWrite(Envoy::Buffer::Instance&, bool) override {
-    return {Envoy::Network::PostIoAction::Close, 0, false};
-  }
-  void onConnected() override {}
-  const Envoy::Ssl::Connection* ssl() const override { return nullptr; }
-};
-
-} // namespace
-
 // TODO(oschaaf): make a concrete implementation out of this one.
 class MClientContextConfigImpl : public Envoy::Ssl::ClientContextConfig {
 public:
