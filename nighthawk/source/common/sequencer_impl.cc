@@ -1,31 +1,35 @@
-#include "nighthawk/common/exception.h"
+#include "nighthawk/source/common/sequencer_impl.h"
 
 #include "common/common/assert.h"
 
-#include "nighthawk/source/common/sequencer_impl.h"
+#include "nighthawk/common/exception.h"
+
+#include "nighthawk/source/common/platform_util_impl.h"
 
 using namespace std::chrono_literals;
 
 namespace Nighthawk {
 
-const std::chrono::milliseconds SequencerImpl::EnvoyTimerMinResolution = 1ms;
+constexpr std::chrono::milliseconds SequencerImpl::EnvoyTimerMinResolution = 1ms;
 
-SequencerImpl::SequencerImpl(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,
-                             RateLimiter& rate_limiter, SequencerTarget& target,
-                             std::chrono::microseconds duration,
+SequencerImpl::SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
+                             Envoy::TimeSource& time_source, RateLimiter& rate_limiter,
+                             SequencerTarget& target, std::chrono::microseconds duration,
                              std::chrono::microseconds grace_timeout)
-    : dispatcher_(dispatcher), time_source_(time_source), rate_limiter_(rate_limiter),
-      target_(target), duration_(duration), grace_timeout_(grace_timeout),
-      start_(time_source.monotonicTime().min()), targets_initiated_(0), targets_completed_(0),
-      spin_when_idle_(true) {
-  if (target_ == nullptr) {
-    throw NighthawkException("SequencerImpl must be constructed with a SequencerTarget.");
-  }
+    : target_(target), platform_util_(platform_util), dispatcher_(dispatcher),
+      time_source_(time_source), rate_limiter_(rate_limiter), duration_(duration),
+      grace_timeout_(grace_timeout), start_(time_source.monotonicTime().min()),
+      targets_initiated_(0), targets_completed_(0), running_(false) {
+  ASSERT(target_ != nullptr, "No SequencerTarget");
   periodic_timer_ = dispatcher_.createTimer([this]() { run(true); });
-  incidental_timer_ = dispatcher_.createTimer([this]() { run(false); });
+  adhoc_timer_ = dispatcher_.createTimer([this]() { run(false); });
 }
 
+SequencerImpl::~SequencerImpl() {}
+
 void SequencerImpl::start() {
+  ASSERT(!running_);
+  running_ = true;
   start_ = time_source_.monotonicTime();
   run(true);
 }
@@ -33,20 +37,26 @@ void SequencerImpl::start() {
 void SequencerImpl::scheduleRun() { periodic_timer_->enableTimer(EnvoyTimerMinResolution); }
 
 void SequencerImpl::stop() {
+  ASSERT(running_);
+  running_ = false;
   periodic_timer_->disableTimer();
-  incidental_timer_->disableTimer();
+  adhoc_timer_->disableTimer();
   periodic_timer_.reset(nullptr);
-  incidental_timer_.reset(nullptr);
+  adhoc_timer_.reset(nullptr);
   dispatcher_.exit();
 }
 
-void SequencerImpl::run(bool from_timer) {
+void SequencerImpl::run(bool from_periodic_timer) {
+  ASSERT(running_);
   const auto now = time_source_.monotonicTime();
+  const auto runtime = now - start_;
 
-  if ((now - start_) > (duration_)) {
-    auto rate = completions_per_second();
+  // If we exceed the benchmark duration.
+  if (runtime > duration_) {
+    const double rate = completionsPerSecond();
 
     if (targets_completed_ == targets_initiated_) {
+      // All work has completed. Stop this sequencer.
       stop();
       ENVOY_LOG(
           trace,
@@ -55,8 +65,9 @@ void SequencerImpl::run(bool from_timer) {
           std::chrono::duration_cast<std::chrono::milliseconds>(now - start_).count(), rate);
       return;
     } else {
-      // We wait until all due responses are in or the grace period times out.
-      if (((now - start_) - duration_) > grace_timeout_) {
+      // After the benchmark duration has exceeded, we wait for a grace period for outstanding work
+      // to wrap up. If that takes too long we warn about it and quit.
+      if (runtime - duration_ > grace_timeout_) {
         stop();
         ENVOY_LOG(warn,
                   "SequencerImpl timeout waiting for due responses. Initiated: {} / Completed: {}. "
@@ -64,7 +75,7 @@ void SequencerImpl::run(bool from_timer) {
                   targets_initiated_, targets_completed_, rate);
         return;
       }
-      if (from_timer) {
+      if (from_periodic_timer) {
         scheduleRun();
       }
     }
@@ -72,11 +83,14 @@ void SequencerImpl::run(bool from_timer) {
   }
 
   while (rate_limiter_.tryAcquireOne()) {
-    bool ok = target_([this, now]() {
+    // The rate limiter says it's OK to proceed and call the target. Let's see if the target is OK
+    // with that as well.
+    const bool ok = target_([this, now]() {
       auto dur = time_source_.monotonicTime() - now;
-      latency_statistic_.addValue(dur.count());
+      latencyStatistic_.addValue(dur.count());
       targets_completed_++;
-      incidental_timer_->enableTimer(0ms);
+      // Immediately schedule us to check again, as chances are we can get on with the next task.
+      adhoc_timer_->enableTimer(0ms);
     });
     if (ok) {
       targets_initiated_++;
@@ -85,29 +99,35 @@ void SequencerImpl::run(bool from_timer) {
       // time of writing this.
       // TODO(oschaaf): Create a specific statistic for tracking time spend here and report.
       // Measurements will be skewed.
+      // The target wasn't able to proceed. Update the rate limiter, we'll try again later.
       rate_limiter_.releaseOne();
       break;
     }
   }
 
-  if (!from_timer) {
-    if (spin_when_idle_ && targets_initiated_ == targets_completed_) {
-      // TODO(oschaaf): Ideally we would have much finer grained timers instead.
-      // TODO(oschaaf): Optionize performing this spin loop.
+  if (!from_periodic_timer) {
+    if (targets_initiated_ == targets_completed_) {
       // We saturated the rate limiter, and there's no outstanding work.
       // That means it looks like we are idle. Spin this event to improve
       // accuracy. As a side-effect, this may help prevent CPU frequency scaling
-      // due to c-state. But on the other hand it may cause thermal throttling.
-      pthread_yield();
-      incidental_timer_->enableTimer(0ms);
+      // due to c-state changes. But on the other hand it may cause thermal throttling.
+      // TODO(oschaaf): Ideally we would have much finer grained timers instead.
+      // TODO(oschaaf): Optionize performing this spin loop.
+      platform_util_.yieldCurrentThread();
+      adhoc_timer_->enableTimer(0ms);
     }
   } else {
+    // Re-schedule the periodic timer if it was responsible for waking up this code.
     scheduleRun();
   }
 }
 
 void SequencerImpl::waitForCompletion() {
+  ASSERT(running_);
   dispatcher_.run(Envoy::Event::Dispatcher::RunType::Block);
+  if (running_) {
+    stop();
+  }
 }
 
 } // namespace Nighthawk

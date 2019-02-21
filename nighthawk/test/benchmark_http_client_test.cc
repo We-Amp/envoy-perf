@@ -17,6 +17,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "nighthawk/source/client/benchmark_http_client.h"
+#include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
 
@@ -286,7 +287,9 @@ TEST_P(BenchmarkClientTest, SequencedH2Test) {
 
   LinearRateLimiter rate_limiter(time_system_, 1_Hz);
   std::chrono::milliseconds duration(5999ms);
-  SequencerImpl sequencer(*dispatcher_, time_system_, rate_limiter, f, duration, 10s);
+  PlatformUtilImpl platform_util;
+  SequencerImpl sequencer(platform_util, *dispatcher_, time_system_, rate_limiter, f, duration,
+                          10s);
 
   sequencer.start();
   sequencer.waitForCompletion();

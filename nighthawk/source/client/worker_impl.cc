@@ -5,6 +5,7 @@
 
 #include "nighthawk/source/client/benchmark_http_client.h"
 #include "nighthawk/source/common/frequency.h"
+#include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 
 using namespace std::chrono_literals;
@@ -31,7 +32,7 @@ void WorkerImpl::work() {
   // TODO(oschaaf): propertly init tls_.
   Envoy::ThreadLocal::InstanceImpl tls_;
   Envoy::Runtime::LoaderImpl runtime_(generator_, *store_, tls_);
-
+  PlatformUtilImpl platform_util;
   auto client_ = std::make_unique<BenchmarkHttpClient>(
       *dispatcher_, *store_, time_system_, options_.uri(),
       std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
@@ -58,7 +59,7 @@ void WorkerImpl::work() {
   LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
   SequencerTarget f =
       std::bind(&BenchmarkHttpClient::tryStartOne, client_.get(), std::placeholders::_1);
-  sequencer_.reset(new SequencerImpl(*dispatcher_, time_system_, rate_limiter, f,
+  sequencer_.reset(new SequencerImpl(platform_util, *dispatcher_, time_system_, rate_limiter, f,
                                      options_.duration(), options_.timeout()));
 
   sequencer_->start();
@@ -69,7 +70,7 @@ void WorkerImpl::work() {
             "{:.{}f}μs. "
             "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
             "resets: {}. ",
-            worker_number_, sequencer_->completions_per_second(), 2, statistic().mean() / 1000, 2,
+            worker_number_, sequencer_->completionsPerSecond(), 2, statistic().mean() / 1000, 2,
             statistic().pstdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
             store_->counter("nighthawk.upstream_cx_connect_fail").value(),
             client_->pool_overflow_failures(), client_->http_good_response_count(),
@@ -88,7 +89,7 @@ void WorkerImpl::waitForCompletion() {
 
 const Statistic& WorkerImpl::statistic() {
   ASSERT(started_ && completed_);
-  return sequencer_->latency_statistic();
+  return sequencer_->latencyStatistic();
 }
 
 } // namespace Client
