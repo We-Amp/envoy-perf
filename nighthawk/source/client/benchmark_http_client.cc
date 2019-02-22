@@ -20,9 +20,8 @@
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "nighthawk/source/client/stream_decoder.h"
 #include "nighthawk/source/common/ssl.h"
-#include "nighthawk/source/common/stream_decoder.h"
-
 #include "nighthawk/source/common/statistic_impl.h"
 
 using namespace std::chrono_literals;
@@ -40,7 +39,8 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
-      requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false) {
+      requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false),
+      measure_latencies_(false) {
   // TODO(oschaaf): handle uri_->isValid()
   request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(uri_->path());
@@ -134,10 +134,11 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  auto stream_decoder = new Nighthawk::Http::StreamDecoder(
-      statistic_, time_source_, std::move(caller_completion_callback), *this);
+  auto stream_decoder =
+      new StreamDecoder(this, connect_statistic_, response_statistic_, time_source_,
+                        std::move(caller_completion_callback), *this);
   requests_initiated_++;
-  pool_->newStream(*stream_decoder, *this);
+  pool_->newStream(*stream_decoder, *stream_decoder);
 
   return true;
 }

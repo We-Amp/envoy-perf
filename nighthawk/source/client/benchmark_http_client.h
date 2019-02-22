@@ -12,14 +12,14 @@
 #include "envoy/stats/store.h"
 #include "envoy/upstream/upstream.h"
 
+#include "nighthawk/source/client/stream_decoder.h"
 #include "nighthawk/source/common/statistic_impl.h"
-#include "nighthawk/source/common/stream_decoder.h"
 #include "nighthawk/source/common/utility.h"
 
 namespace Nighthawk {
 namespace Client {
 
-class BenchmarkHttpClient : public Nighthawk::Http::StreamDecoderCompletionCallback,
+class BenchmarkHttpClient : public StreamDecoderCompletionCallback,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main>,
                             public Envoy::Http::ConnectionPool::Callbacks {
 public:
@@ -55,7 +55,13 @@ public:
     allow_pending_for_test_ = allow_pending_for_test;
   }
 
-  const Statistic& statistic() { return statistic_; }
+  const Statistic& responseStatistic() const { return response_statistic_; }
+  const Statistic& connectionStatistic() const { return connect_statistic_; }
+
+  const Envoy::Http::HeaderMapImpl& request_headers() const { return *request_headers_; }
+
+  bool measureLatencies() const { return measure_latencies_; }
+  void setMeasureLatencies(bool measure_latencies) { measure_latencies_ = measure_latencies; }
 
 private:
   void syncResolveDns();
@@ -65,7 +71,8 @@ private:
   Envoy::TimeSource& time_source_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
-  HdrStatistic statistic_;
+  HdrStatistic response_statistic_;
+  HdrStatistic connect_statistic_;
   const bool use_h2_;
   const std::unique_ptr<Uri> uri_;
   // dns_failure_ will be set by syncResolveDns. If false, the benchmark client should be disposed,
@@ -85,6 +92,7 @@ private:
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool allow_pending_for_test_;
+  bool measure_latencies_;
 };
 
 } // namespace Client

@@ -22,6 +22,7 @@ envoy_cc_library(
         "client.cc",
         "options_impl.cc",
         "output_formatter_impl.cc",
+        "stream_decoder.cc",
         "worker_impl.cc",
     ],
     hdrs = [
@@ -29,6 +30,7 @@ envoy_cc_library(
         "client.h",
         "options_impl.h",
         "output_formatter_impl.h",
+        "stream_decoder.h",
         "worker_impl.h",
     ],
     repository = "@envoy",

@@ -88,23 +88,43 @@ bool Main::run() {
     workers[i]->start();
   }
 
-  std::unique_ptr<Statistic> latency_statistics = std::make_unique<HdrStatistic>();
-  std::unique_ptr<Statistic> blocked_statistics = std::make_unique<HdrStatistic>();
   for (auto& w : workers) {
     w->waitForCompletion();
-    latency_statistics = latency_statistics->combine(w->sequencer().latencyStatistic());
-    blocked_statistics = blocked_statistics->combine(w->sequencer().blockedStatistic());
   }
+
+  std::unique_ptr<Statistic> sequencer_statistic = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> blocked_statistic = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> connection_statistic = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> response_statistic = std::make_unique<HdrStatistic>();
+
+  for (auto& w : workers) {
+    sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
+    blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
+    connection_statistic =
+        connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
+    response_statistic =
+        response_statistic->combine(w->benchmark_http_client().responseStatistic());
+  }
+
   workers.clear();
 
-  ENVOY_LOG(info, "{}", "Latency percentiles");
-  ENVOY_LOG(info, "{}", latency_statistics->toString());
-
-  if (blocked_statistics->count() > 0) {
-    ENVOY_LOG(warn, "Sequencer target was blocking on {} calls. Latency statistics are skewed.",
-              blocked_statistics->count());
-    ENVOY_LOG(info, "{}", blocked_statistics->toString());
+  if (blocked_statistic->count() > 0) {
+    ENVOY_LOG(
+        warn,
+        "Sequencer observed the target to be blocking on {} calls. Latency statistics are skewed.",
+        blocked_statistic->count());
   }
+
+  std::string cli_result =
+      fmt::format("**************** Global Statistics ************* \n"
+                  "Sequencer timing:\n{}\n"
+                  "Request/Response   timing:\n{}\n"
+                  "Connection/queuing timing:\n{}\n"
+                  "Sequencer blocking:\n{}\n",
+                  sequencer_statistic->toString(), response_statistic->toString(),
+                  connection_statistic->toString(), blocked_statistic->toString());
+
+  ENVOY_LOG(info, "{}", cli_result);
 
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
@@ -114,7 +134,7 @@ bool Main::run() {
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
   nighthawk::client::Statistic* latency_statistic = output.mutable_latency();
-  *latency_statistic = latency_statistics->toProto();
+  *latency_statistic = sequencer_statistic->toProto();
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

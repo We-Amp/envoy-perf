@@ -11,7 +11,6 @@ envoy_cc_library(
         "rate_limiter_impl.cc",
         "sequencer_impl.cc",
         "statistic_impl.cc",
-        "stream_decoder.cc",
         "utility.cc",
     ],
     hdrs = [
@@ -21,7 +20,6 @@ envoy_cc_library(
         "sequencer_impl.h",
         "ssl.h",
         "statistic_impl.h",
-        "stream_decoder.h",
         "utility.h",
     ],
     repository = "@envoy",
