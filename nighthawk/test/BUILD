@@ -23,6 +23,7 @@ envoy_cc_test(
         "benchmark_http_client_test.cc",
         "frequency_test.cc",
         "options_test.cc",
+        "platform_util_test.cc",
         "rate_limiter_test.cc",
         "sequencer_test.cc",
         "statistic_test.cc",
