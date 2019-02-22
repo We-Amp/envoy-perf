@@ -70,8 +70,10 @@ void WorkerImpl::work() {
             "{:.{}f}μs. "
             "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
             "resets: {}. ",
-            worker_number_, sequencer_->completionsPerSecond(), 2, statistic().mean() / 1000, 2,
-            statistic().pstdev() / 1000, 2, store_->counter("nighthawk.upstream_cx_total").value(),
+            worker_number_, sequencer_->completionsPerSecond(), 2,
+            sequencer_->latencyStatistic().mean() / 1000, 2,
+            sequencer_->latencyStatistic().pstdev() / 1000, 2,
+            store_->counter("nighthawk.upstream_cx_total").value(),
             store_->counter("nighthawk.upstream_cx_connect_fail").value(),
             client_->pool_overflow_failures(), client_->http_good_response_count(),
             client_->http_bad_response_count(), client_->stream_reset_count());
@@ -87,9 +89,10 @@ void WorkerImpl::waitForCompletion() {
   thread_->join();
 }
 
-const Statistic& WorkerImpl::statistic() {
+const Sequencer& WorkerImpl::sequencer() const {
+  // TODO(oschaaf): reconsider.
   ASSERT(started_ && completed_);
-  return sequencer_->latencyStatistic();
+  return *sequencer_;
 }
 
 } // namespace Client

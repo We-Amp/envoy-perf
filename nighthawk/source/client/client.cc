@@ -88,15 +88,24 @@ bool Main::run() {
     workers[i]->start();
   }
 
-  std::unique_ptr<Statistic> merged_statistics = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> latency_statistics = std::make_unique<HdrStatistic>();
+  std::unique_ptr<Statistic> blocked_statistics = std::make_unique<HdrStatistic>();
   for (auto& w : workers) {
     w->waitForCompletion();
-    merged_statistics = merged_statistics->combine(w->statistic());
+    latency_statistics = latency_statistics->combine(w->sequencer().latencyStatistic());
+    blocked_statistics = blocked_statistics->combine(w->sequencer().blockedStatistic());
   }
   workers.clear();
 
-  ENVOY_LOG(info, "{}", concurrency > 1 ? "X-Thread statistics" : "Statistics");
-  ENVOY_LOG(info, "{}", merged_statistics->toString());
+  ENVOY_LOG(info, "{}", "Latency percentiles");
+  ENVOY_LOG(info, "{}", latency_statistics->toString());
+
+  if (blocked_statistics->count() > 0) {
+    ENVOY_LOG(warn, "Sequencer target was blocking on {} calls. This potentially skews results.",
+              blocked_statistics->count());
+    ENVOY_LOG(info, "{}", blocked_statistics->toString());
+  }
+
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
 
@@ -105,7 +114,7 @@ bool Main::run() {
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
   nighthawk::client::Statistic* latency_statistic = output.mutable_latency();
-  *latency_statistic = merged_statistics->toProto();
+  *latency_statistic = latency_statistics->toProto();
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

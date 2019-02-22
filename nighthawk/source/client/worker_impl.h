@@ -21,7 +21,7 @@ public:
 
   void start() override;
   void waitForCompletion() override;
-  const Statistic& statistic() override;
+  const Sequencer& sequencer() const override;
 
 private:
   void work();

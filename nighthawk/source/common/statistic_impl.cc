@@ -9,8 +9,8 @@
 namespace Nighthawk {
 
 std::string StatisticImpl::toString() const {
-  return fmt::format("#Completed: {}. Mean: {:.{}f}μs. pstdev: {:.{}f}μs.\n", count(),
-                     mean() / 1000, 2, pstdev() / 1000, 2);
+  return fmt::format("Count: {}. Mean: {:.{}f}μs. pstdev: {:.{}f}μs.\n", count(), mean() / 1000, 2,
+                     pstdev() / 1000, 2);
 }
 
 nighthawk::client::Statistic StatisticImpl::toProto() {
@@ -160,7 +160,7 @@ std::string HdrStatistic::toString() const {
   std::stringstream stream;
 
   stream << StatisticImpl::toString();
-  stream << fmt::format("{:>12} {:>14} (us)", "Percentile", "Latency") << std::endl;
+  stream << fmt::format("{:>12} {:>14} (usec)", "Percentile", "Time") << std::endl;
 
   std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
   for (uint64_t i = 0; i < percentiles.size(); i++) {

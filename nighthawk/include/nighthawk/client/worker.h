@@ -4,7 +4,7 @@
 
 #include "envoy/common/pure.h"
 
-#include "nighthawk/common/statistic.h"
+#include "nighthawk/common/sequencer.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -27,10 +27,10 @@ public:
   virtual void waitForCompletion() PURE;
 
   /**
-   * Get the latency statistics. Only to be called after waitForCompletion().
-   * @return const Statistic&
+   * Get the associated Sequencer.
+   * @return const Sequencer&
    */
-  virtual const Statistic& statistic() PURE;
+  virtual const Sequencer& sequencer() const PURE;
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;
