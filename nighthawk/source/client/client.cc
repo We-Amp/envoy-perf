@@ -101,7 +101,7 @@ bool Main::run() {
   ENVOY_LOG(info, "{}", latency_statistics->toString());
 
   if (blocked_statistics->count() > 0) {
-    ENVOY_LOG(warn, "Sequencer target was blocking on {} calls. This potentially skews results.",
+    ENVOY_LOG(warn, "Sequencer target was blocking on {} calls. Latency statistics are skewed.",
               blocked_statistics->count());
     ENVOY_LOG(info, "{}", blocked_statistics->toString());
   }

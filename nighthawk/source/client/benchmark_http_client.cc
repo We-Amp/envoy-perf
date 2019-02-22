@@ -23,6 +23,8 @@
 #include "nighthawk/source/common/ssl.h"
 #include "nighthawk/source/common/stream_decoder.h"
 
+#include "nighthawk/source/common/statistic_impl.h"
+
 using namespace std::chrono_literals;
 
 namespace Nighthawk {
@@ -132,8 +134,8 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  auto stream_decoder =
-      new Nighthawk::Http::StreamDecoder(std::move(caller_completion_callback), *this);
+  auto stream_decoder = new Nighthawk::Http::StreamDecoder(
+      statistic_, time_source_, std::move(caller_completion_callback), *this);
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *this);
 

@@ -12,6 +12,7 @@
 #include "envoy/stats/store.h"
 #include "envoy/upstream/upstream.h"
 
+#include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/stream_decoder.h"
 #include "nighthawk/source/common/utility.h"
 
@@ -54,6 +55,8 @@ public:
     allow_pending_for_test_ = allow_pending_for_test;
   }
 
+  const Statistic& statistic() { return statistic_; }
+
 private:
   void syncResolveDns();
 
@@ -62,6 +65,7 @@ private:
   Envoy::TimeSource& time_source_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
+  HdrStatistic statistic_;
   const bool use_h2_;
   const std::unique_ptr<Uri> uri_;
   // dns_failure_ will be set by syncResolveDns. If false, the benchmark client should be disposed,

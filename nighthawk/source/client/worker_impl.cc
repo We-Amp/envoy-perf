@@ -77,6 +77,9 @@ void WorkerImpl::work() {
             store_->counter("nighthawk.upstream_cx_connect_fail").value(),
             client_->pool_overflow_failures(), client_->http_good_response_count(),
             client_->http_bad_response_count(), client_->stream_reset_count());
+
+  ENVOY_LOG(info, "{}", "Latency percentiles from worker benchmark client");
+  ENVOY_LOG(info, "{}", client_->statistic().toString());
   // Drop everything that is outstanding by resetting the client.
   client_.reset();
   // TODO(oschaaf): shouldn't be doing this here, properly init tls_

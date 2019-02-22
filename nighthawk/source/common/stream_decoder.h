@@ -3,6 +3,9 @@
 #include <functional>
 
 #include "common/http/codec_wrappers.h"
+#include "envoy/common/time.h"
+
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Http {
@@ -18,10 +21,12 @@ public:
  */
 class StreamDecoder : public Envoy::Http::StreamDecoder, public Envoy::Http::StreamCallbacks {
 public:
-  StreamDecoder(std::function<void()> caller_completion_callback,
+  StreamDecoder(Statistic& statistic, Envoy::TimeSource& time_source,
+                std::function<void()> caller_completion_callback,
                 StreamDecoderCompletionCallback& on_complete_cb)
       : caller_completion_callback_(std::move(caller_completion_callback)),
-        on_complete_cb_(on_complete_cb) {}
+        on_complete_cb_(on_complete_cb), statistic_(statistic), time_source_(time_source),
+        start_(time_source_.monotonicTime()) {}
 
   bool complete() { return complete_; }
   const Envoy::Http::HeaderMap& headers() { return *headers_; }
@@ -45,6 +50,9 @@ private:
   bool complete_{};
   std::function<void()> caller_completion_callback_;
   StreamDecoderCompletionCallback& on_complete_cb_;
+  Statistic& statistic_;
+  Envoy::TimeSource& time_source_;
+  Envoy::MonotonicTime start_;
 };
 
 } // namespace Http

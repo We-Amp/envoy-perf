@@ -26,6 +26,9 @@ void StreamDecoder::decodeData(Envoy::Buffer::Instance&, bool end_stream) {
 void StreamDecoder::decodeTrailers(Envoy::Http::HeaderMapPtr&&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 void StreamDecoder::onComplete(bool success) {
+  if (success) {
+    statistic_.addValue((time_source_.monotonicTime() - start_).count());
+  }
   ASSERT(complete_);
   on_complete_cb_.onComplete(success, *headers_);
   caller_completion_callback_();
