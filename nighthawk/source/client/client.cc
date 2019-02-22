@@ -100,10 +100,10 @@ bool Main::run() {
   for (auto& w : workers) {
     sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
     blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
-    connection_statistic =
-        connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
-    response_statistic =
-        response_statistic->combine(w->benchmark_http_client().responseStatistic());
+    // connection_statistic =
+    //    connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
+    // response_statistic =
+    //    response_statistic->combine(w->benchmark_http_client().responseStatistic());
   }
 
   workers.clear();

@@ -43,7 +43,7 @@ void WorkerImpl::work() {
   benchmark_http_client_->set_connection_limit(options_.connections());
   benchmark_http_client_->initialize(runtime_);
 
-  ENVOY_LOG(info, "> worker {}: warming up.", worker_number_);
+  ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
 
   for (int i = 0; i < 5; i++) {
     benchmark_http_client_->tryStartOne([&dispatcher_] { dispatcher_->exit(); });
@@ -77,7 +77,7 @@ void WorkerImpl::work() {
       benchmark_http_client_->connectionStatistic().toString(),
       benchmark_http_client_->responseStatistic().toString());
 
-  ENVOY_LOG(info,
+  ENVOY_LOG(debug,
             "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. pstdev: "
             "{:.{}f}μs. "
             "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
