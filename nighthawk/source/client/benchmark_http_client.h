@@ -63,6 +63,8 @@ public:
   bool measureLatencies() const { return measure_latencies_; }
   void setMeasureLatencies(bool measure_latencies) { measure_latencies_ = measure_latencies; }
 
+  void resetPool() { pool_.reset(); }
+
 private:
   void syncResolveDns();
 

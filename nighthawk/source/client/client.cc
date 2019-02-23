@@ -13,6 +13,8 @@
 #include "common/event/dispatcher_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/network/utility.h"
+#include "common/stats/isolated_store_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
@@ -81,10 +83,21 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
+  Envoy::Stats::IsolatedStoreImpl store;
+  Envoy::Api::Impl api(1000ms * 1000, thread_factory, store, *time_system_);
+  Envoy::ThreadLocal::InstanceImpl tls;
+  Envoy::Event::DispatcherPtr main_dispatcher(api.allocateDispatcher());
+  // TODO(oschaaf): later on, fire up and use a main dispatcher loop as need arises.
+  tls.registerThread(*main_dispatcher, true);
+  Envoy::Runtime::RandomGeneratorImpl generator;
+  Envoy::Runtime::LoaderImpl runtime(generator, store, tls);
+
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerImplPtr> workers;
   for (uint32_t i = 0; i < concurrency; i++) {
-    workers.push_back(std::make_unique<WorkerImpl>(thread_factory, *options_, i));
+    Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
+    workers.push_back(std::make_unique<WorkerImpl>(tls, std::move(dispatcher), /*runtime, store,*/
+                                                   thread_factory, *options_, i));
     workers[i]->start();
   }
 
@@ -100,13 +113,13 @@ bool Main::run() {
   for (auto& w : workers) {
     sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
     blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
-    // connection_statistic =
-    //    connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
-    // response_statistic =
-    //    response_statistic->combine(w->benchmark_http_client().responseStatistic());
+    connection_statistic =
+        connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
+    response_statistic =
+        response_statistic->combine(w->benchmark_http_client().responseStatistic());
   }
 
-  workers.clear();
+  tls.shutdownGlobalThreading();
 
   if (blocked_statistic->count() > 0) {
     ENVOY_LOG(
@@ -115,14 +128,15 @@ bool Main::run() {
         blocked_statistic->count());
   }
 
-  std::string cli_result =
-      fmt::format("**************** Global Statistics ************* \n"
-                  "Sequencer timing:\n{}\n"
-                  "Request/Response   timing:\n{}\n"
-                  "Connection/queuing timing:\n{}\n"
-                  "Sequencer blocking:\n{}\n",
-                  sequencer_statistic->toString(), response_statistic->toString(),
-                  connection_statistic->toString(), blocked_statistic->toString());
+  std::string cli_result = fmt::format(
+      "Done.\n********************** Global Statistics ******************** \n"
+      "Sequencer timing:\n{}\n"
+      "Request/Response   timing:\n{}\n"
+      "Connection/queuing timing:\n{}\n"
+      "Sequencer blocking:\n{}\n",
+      sequencer_statistic->toString(), response_statistic->toString(),
+      connection_statistic->toString(),
+      blocked_statistic->count() > 0 ? blocked_statistic->toString() : "No blocking was observed.");
 
   ENVOY_LOG(info, "{}", cli_result);
 

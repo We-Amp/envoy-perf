@@ -4,6 +4,7 @@
 #include "common/common/thread_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stats/isolated_store_impl.h"
 
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"
@@ -17,7 +18,8 @@ namespace Client {
 
 class WorkerImpl : Worker, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory, const Options& options,
+  WorkerImpl(Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
+             Envoy::Thread::ThreadFactory& thread_factory, const Options& options,
              const int worker_number);
   ~WorkerImpl() override;
   void start() override;
@@ -30,11 +32,15 @@ public:
 private:
   void work();
 
+  Envoy::ThreadLocal::Instance& tls_;
+  Envoy::Event::DispatcherPtr dispatcher_;
+  Envoy::Stats::IsolatedStoreImpl store_;
+  std::unique_ptr<Envoy::Runtime::LoaderImpl> runtime_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
   Envoy::Event::RealTimeSystem time_system_;
   std::unique_ptr<SequencerImpl> sequencer_;
   std::unique_ptr<BenchmarkHttpClient> benchmark_http_client_;
-  Envoy::Thread::ThreadFactoryImplPosix& thread_factory_;
+  Envoy::Thread::ThreadFactory& thread_factory_;
   Envoy::Thread::ThreadPtr thread_;
 
   const int worker_number_;

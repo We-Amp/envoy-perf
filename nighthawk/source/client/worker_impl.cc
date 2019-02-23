@@ -13,12 +13,16 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-WorkerImpl::WorkerImpl(Envoy::Thread::ThreadFactoryImplPosix& thread_factory,
-                       const Options& options, const int worker_number)
-    : thread_factory_(thread_factory), worker_number_(worker_number), options_(options),
-      started_(false), completed_(false) {}
+WorkerImpl::WorkerImpl(Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
+                       Envoy::Thread::ThreadFactory& thread_factory, const Options& options,
+                       const int worker_number)
+    : tls_(tls), dispatcher_(std::move(dispatcher)), thread_factory_(thread_factory),
+      worker_number_(worker_number), options_(options), started_(false), completed_(false) {
+  tls_.registerThread(*dispatcher_, false);
+  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, store_, tls_);
+}
 
-WorkerImpl::~WorkerImpl() {}
+WorkerImpl::~WorkerImpl() { tls_.shutdownThread(); }
 
 void WorkerImpl::start() {
   ASSERT(!started_ && !completed_);
@@ -26,27 +30,18 @@ void WorkerImpl::start() {
   thread_ = thread_factory_.createThread([this]() { work(); });
 }
 void WorkerImpl::work() {
-  auto store_ = std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
-  auto api_ = std::make_unique<Envoy::Api::Impl>(1000ms /*flush interval*/, thread_factory_,
-                                                 *store_, time_system_);
-  auto dispatcher_ = api_->allocateDispatcher();
-
-  // TODO(oschaaf): propertly init tls_.
-  Envoy::ThreadLocal::InstanceImpl tls_;
-  Envoy::Runtime::LoaderImpl runtime_(generator_, *store_, tls_);
   PlatformUtilImpl platform_util;
   benchmark_http_client_ = std::make_unique<BenchmarkHttpClient>(
-      *dispatcher_, *store_, time_system_, options_.uri(),
+      *dispatcher_, store_, time_system_, options_.uri(),
       std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
 
   benchmark_http_client_->set_connection_timeout(options_.timeout());
   benchmark_http_client_->set_connection_limit(options_.connections());
-  benchmark_http_client_->initialize(runtime_);
-
+  benchmark_http_client_->initialize(*runtime_);
   ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
 
   for (int i = 0; i < 5; i++) {
-    benchmark_http_client_->tryStartOne([&dispatcher_] { dispatcher_->exit(); });
+    benchmark_http_client_->tryStartOne([this] { dispatcher_->exit(); });
   }
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
@@ -85,16 +80,16 @@ void WorkerImpl::work() {
             worker_number_, sequencer_->completionsPerSecond(), 2,
             sequencer_->latencyStatistic().mean() / 1000, 2,
             sequencer_->latencyStatistic().pstdev() / 1000, 2,
-            store_->counter("nighthawk.upstream_cx_total").value(),
-            store_->counter("nighthawk.upstream_cx_connect_fail").value(),
+            store_.counter("nighthawk.upstream_cx_total").value(),
+            store_.counter("nighthawk.upstream_cx_connect_fail").value(),
             benchmark_http_client_->pool_overflow_failures(),
             benchmark_http_client_->http_good_response_count(),
             benchmark_http_client_->http_bad_response_count(),
             benchmark_http_client_->stream_reset_count(), worker_percentiles);
-  // Drop everything that is outstanding by resetting the client.
-  benchmark_http_client_.reset();
-  // TODO(oschaaf): shouldn't be doing this here, properly init tls_
-  tls_.shutdownGlobalThreading();
+
+  // Kill the connection pool to ensure no inbound events make it.
+  benchmark_http_client_->resetPool();
+  dispatcher_->exit();
 }
 
 void WorkerImpl::waitForCompletion() {
