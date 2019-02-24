@@ -3,15 +3,13 @@
 #include "common/http/http1/codec_impl.h"
 #include "common/http/utility.h"
 
-#include "nighthawk/source/client/benchmark_http_client.h"
-
 namespace Nighthawk {
 namespace Client {
 
 void StreamDecoder::decodeHeaders(Envoy::Http::HeaderMapPtr&& headers, bool end_stream) {
   ASSERT(!complete_);
   complete_ = end_stream;
-  headers_ = std::move(headers);
+  response_headers_ = std::move(headers);
   if (complete_) {
     onComplete(true);
   }
@@ -28,11 +26,11 @@ void StreamDecoder::decodeData(Envoy::Buffer::Instance&, bool end_stream) {
 void StreamDecoder::decodeTrailers(Envoy::Http::HeaderMapPtr&&) { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
 void StreamDecoder::onComplete(bool success) {
-  if (success && benchmark_client_->measureLatencies()) {
+  if (success && measure_latencies_) {
     latency_statistic_.addValue((time_source_.monotonicTime() - request_start_).count());
   }
   ASSERT(complete_);
-  on_complete_cb_.onComplete(success, *headers_);
+  on_complete_cb_.onComplete(success, *response_headers_);
   caller_completion_callback_();
   delete this;
 }
@@ -40,15 +38,15 @@ void StreamDecoder::onComplete(bool success) {
 void StreamDecoder::onResetStream(Envoy::Http::StreamResetReason) { onComplete(false); }
 
 void StreamDecoder::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason,
-                                  Envoy::Upstream::HostDescriptionConstSharedPtr host) {
-  benchmark_client_->onPoolFailure(reason, host);
+                                  Envoy::Upstream::HostDescriptionConstSharedPtr) {
+  benchmark_client_->onPoolFailure(reason);
 }
 
 void StreamDecoder::onPoolReady(Envoy::Http::StreamEncoder& encoder,
                                 Envoy::Upstream::HostDescriptionConstSharedPtr) {
-  encoder.encodeHeaders(benchmark_client_->request_headers(), true);
+  encoder.encodeHeaders(request_headers_, true);
   request_start_ = time_source_.monotonicTime();
-  if (benchmark_client_->measureLatencies()) {
+  if (measure_latencies_) {
     connect_statistic_.addValue((request_start_ - connect_start_).count());
   }
 }

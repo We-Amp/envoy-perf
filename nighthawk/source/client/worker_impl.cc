@@ -3,21 +3,24 @@
 #include "common/api/api_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "nighthawk/source/client/benchmark_http_client.h"
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
+#include "nighthawk/source/common/sequencer_impl.h"
 
 using namespace std::chrono_literals;
 
 namespace Nighthawk {
 namespace Client {
 
+// TODO(oschaaf): Fix argument ordering here.
 WorkerImpl::WorkerImpl(Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
                        Envoy::Thread::ThreadFactory& thread_factory, const Options& options,
-                       const int worker_number)
+                       int worker_number, uint64_t start_delay_usec,
+                       std::unique_ptr<BenchmarkClient>&& benchmark_client)
     : tls_(tls), dispatcher_(std::move(dispatcher)), thread_factory_(thread_factory),
-      worker_number_(worker_number), options_(options), started_(false), completed_(false) {
+      worker_number_(worker_number), start_delay_usec_(start_delay_usec), options_(options),
+      started_(false), completed_(false), benchmark_client_(std::move(benchmark_client)) {
   tls_.registerThread(*dispatcher_, false);
   runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, store_, tls_);
 }
@@ -31,64 +34,64 @@ void WorkerImpl::start() {
 }
 void WorkerImpl::work() {
   PlatformUtilImpl platform_util;
-  benchmark_http_client_ = std::make_unique<BenchmarkHttpClient>(
-      *dispatcher_, store_, time_system_, options_.uri(),
-      std::make_unique<Envoy::Http::HeaderMapImpl>(), options_.h2());
+  benchmark_client_->initialize(*runtime_);
 
-  benchmark_http_client_->set_connection_timeout(options_.timeout());
-  benchmark_http_client_->set_connection_limit(options_.connections());
-  benchmark_http_client_->initialize(*runtime_);
   ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
 
   for (int i = 0; i < 5; i++) {
-    benchmark_http_client_->tryStartOne([this] { dispatcher_->exit(); });
+    benchmark_client_->tryStartOne([this] { dispatcher_->exit(); });
   }
-  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
-  // We try to offset the start of each thread so that workers will execute tasks evenly spaced
-  // in time.
-  double rate = 1 / double(options_.requests_per_second()) / worker_number_;
-  int64_t spread_us = static_cast<int64_t>(rate * worker_number_ * 1000000);
-  ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", worker_number_, spread_us);
-  if (spread_us) {
-    // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
-    // which is rather coarse for our purpose here.
-    usleep(spread_us);
-  }
-  benchmark_http_client_->setMeasureLatencies(true);
+  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+  benchmark_client_->setMeasureLatencies(true);
+
+  ENVOY_LOG(debug, "> worker {}: Delay start of worker for {} us.", worker_number_,
+            start_delay_usec_);
+  // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
+  // which is rather coarse for our purpose here. Probably it would be better to provide an absolute
+  // starting time and wait for that in the (spin loop of the) sequencer implementation for high
+  // accuracy.
+  usleep(start_delay_usec_);
 
   LinearRateLimiter rate_limiter(time_system_, Frequency(options_.requests_per_second()));
-  SequencerTarget f = std::bind(&BenchmarkHttpClient::tryStartOne, benchmark_http_client_.get(),
-                                std::placeholders::_1);
+  SequencerTarget f =
+      std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
   sequencer_.reset(new SequencerImpl(platform_util, *dispatcher_, time_system_, rate_limiter, f,
                                      options_.duration(), options_.timeout()));
 
   sequencer_->start();
   sequencer_->waitForCompletion();
 
+  // TODO(oschaaf): need this to be generic.
+  const Statistic& connection_statistic = std::get<1>(benchmark_client_->statistics().front());
+  const Statistic& response_statistic = std::get<1>(benchmark_client_->statistics().back());
+
   std::string worker_percentiles = fmt::format(
       "Internal plus connection setup latency percentiles:\n{}\nRequest/response latency "
       "percentiles:\n{}",
-      benchmark_http_client_->connectionStatistic().toString(),
-      benchmark_http_client_->responseStatistic().toString());
+      connection_statistic.toString(), response_statistic.toString());
 
-  ENVOY_LOG(debug,
-            "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. pstdev: "
-            "{:.{}f}μs. "
-            "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
-            "resets: {}.\n {}",
-            worker_number_, sequencer_->completionsPerSecond(), 2,
-            sequencer_->latencyStatistic().mean() / 1000, 2,
-            sequencer_->latencyStatistic().pstdev() / 1000, 2,
-            store_.counter("nighthawk.upstream_cx_total").value(),
-            store_.counter("nighthawk.upstream_cx_connect_fail").value(),
-            benchmark_http_client_->pool_overflow_failures(),
-            benchmark_http_client_->http_good_response_count(),
-            benchmark_http_client_->http_bad_response_count(),
-            benchmark_http_client_->stream_reset_count(), worker_percentiles);
+  /*
+    ENVOY_LOG(info,
+              "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. pstdev: "
+              "{:.{}f}μs. "
+              "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
+              "resets: {}.\n {}",
+              worker_number_, sequencer_->completionsPerSecond(), 2,
+              sequencer_->latencyStatistic().mean() / 1000, 2,
+              sequencer_->latencyStatistic().pstdev() / 1000, 2,
+              store_.counter("nighthawk.upstream_cx_total").value(),
+              store_.counter("nighthawk.upstream_cx_connect_fail").value(),
+              benchmark_client_->pool_overflow_failures(),
+              benchmark_client_->http_good_response_count(),
+              benchmark_client_->http_bad_response_count(), benchmark_client_->stream_reset_count(),
+              worker_percentiles);
+  */
 
-  // Kill the connection pool to ensure no inbound events make it.
-  benchmark_http_client_->resetPool();
+  // TOOD(oschaaf): Some of the benchmark_client members we call are specific to the
+  // HttpBenchmarkClient. Generalize that in the interface, and re-enable after adjusting for that.
+
+  benchmark_client_->terminate();
   dispatcher_->exit();
 }
 
@@ -104,10 +107,10 @@ const Sequencer& WorkerImpl::sequencer() const {
   return *sequencer_;
 }
 
-const BenchmarkHttpClient& WorkerImpl::benchmark_http_client() const {
+const BenchmarkClient& WorkerImpl::benchmark_client() const {
   // TODO(oschaaf): reconsider.
   ASSERT(started_ && completed_);
-  return *benchmark_http_client_;
+  return *benchmark_client_;
 }
 
 } // namespace Client

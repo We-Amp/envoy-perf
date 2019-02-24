@@ -1,4 +1,4 @@
-#include "nighthawk/source/client/benchmark_http_client.h"
+#include "nighthawk/source/client/benchmark_client_impl.h"
 
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -30,18 +30,17 @@ namespace Nighthawk {
 namespace Client {
 
 BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
-                                         Envoy::Stats::Store& store, Envoy::TimeSource& time_source,
-                                         const std::string& uri,
+                                         Envoy::TimeSource& time_source, const std::string& uri,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
                                          bool use_h2)
-    : dispatcher_(dispatcher), store_(store), time_source_(time_source),
+    : dispatcher_(dispatcher), time_source_(time_source),
       request_headers_(std::move(request_headers)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
       requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false),
       measure_latencies_(false) {
-  // TODO(oschaaf): handle uri_->isValid()
+  ASSERT(uri_->isValid());
   request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(uri_->path());
   request_headers_->insertHost().value(uri_->host_and_port());
@@ -125,7 +124,9 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
            .canCreate()
-      // XXX(oschaaf): We can't rely on resourceManager()::requests() because that
+      // In closed loop we want to be able to control the pacing as
+      // exactly as possible.
+      // TODO(oschaaf): We can't rely on resourceManager()::requests() because that
       // isn't used for h/1 (it is used in tcp and h2 though).
       // Note: this improves accuracy, but some tests rely on pending requests functional
       // to queue up requests.
@@ -134,9 +135,9 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  auto stream_decoder =
-      new StreamDecoder(this, connect_statistic_, response_statistic_, time_source_,
-                        std::move(caller_completion_callback), *this);
+  auto stream_decoder = new StreamDecoder(this, connect_statistic_, response_statistic_,
+                                          time_source_, std::move(caller_completion_callback),
+                                          *this, this->measureLatencies(), this->request_headers());
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *stream_decoder);
 
@@ -159,8 +160,7 @@ void BenchmarkHttpClient::onComplete(bool success, const Envoy::Http::HeaderMap&
   }
 }
 
-void BenchmarkHttpClient::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason,
-                                        Envoy::Upstream::HostDescriptionConstSharedPtr) {
+void BenchmarkHttpClient::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) {
   switch (reason) {
   case Envoy::Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
     break;
@@ -170,11 +170,6 @@ void BenchmarkHttpClient::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailure
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
-}
-
-void BenchmarkHttpClient::onPoolReady(Envoy::Http::StreamEncoder& encoder,
-                                      Envoy::Upstream::HostDescriptionConstSharedPtr) {
-  encoder.encodeHeaders(*request_headers_, true);
 }
 
 } // namespace Client

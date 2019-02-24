@@ -13,7 +13,7 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 
-#include "nighthawk/source/client/benchmark_http_client.h"
+#include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
@@ -188,7 +188,7 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
 TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
   Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
   request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-  Client::BenchmarkHttpClient client(*dispatcher_, store_, time_system_,
+  Client::BenchmarkHttpClient client(*dispatcher_, time_system_,
                                      fmt::format("http://{}/", getTestServerHostAndPort()),
                                      std::move(request_headers), false /*use h2*/);
 
@@ -220,6 +220,7 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(0, inflight_response_count);
+  // TODO(oschaaf): benchark client has it's own isolated store.
   EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
   EXPECT_EQ(0, client.http_bad_response_count());
   EXPECT_EQ(0, client.stream_reset_count());
@@ -230,7 +231,7 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
 TEST_P(BenchmarkClientTest, BasicTestH1WithoutRequestQueue) {
   Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
   request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-  Client::BenchmarkHttpClient client(*dispatcher_, store_, time_system_,
+  Client::BenchmarkHttpClient client(*dispatcher_, time_system_,
                                      fmt::format("http://{}/", getTestServerHostAndPort()),
                                      std::move(request_headers), false /*use h2*/);
 
@@ -260,6 +261,7 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithoutRequestQueue) {
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(0, inflight_response_count);
+  // TODO(oschaaf): benchark client has it's own isolated store.
   EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
   EXPECT_EQ(0, client.http_bad_response_count());
   EXPECT_EQ(0, client.stream_reset_count());
@@ -274,7 +276,7 @@ TEST_P(BenchmarkClientTest, SequencedH2Test) {
   Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
   request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
 
-  Client::BenchmarkHttpClient client(*dispatcher_, store_, time_system_,
+  Client::BenchmarkHttpClient client(*dispatcher_, time_system_,
                                      fmt::format("https://{}/", getTestServerHostAndSslPort()),
                                      std::move(request_headers), true /*use h2*/);
   client.initialize(runtime_);
@@ -291,6 +293,7 @@ TEST_P(BenchmarkClientTest, SequencedH2Test) {
   sequencer.start();
   sequencer.waitForCompletion();
 
+  // TODO(oschaaf): benchark client has it's own isolated store.
   EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
   EXPECT_EQ(0, client.http_bad_response_count());
   EXPECT_EQ(0, client.stream_reset_count());

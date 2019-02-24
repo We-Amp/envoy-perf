@@ -18,7 +18,7 @@ api_proto_library_internal(
 envoy_cc_library(
     name = "nighthawk_client_lib",
     srcs = [
-        "benchmark_http_client.cc",
+        "benchmark_client_impl.cc",
         "client.cc",
         "options_impl.cc",
         "output_formatter_impl.cc",
@@ -26,7 +26,7 @@ envoy_cc_library(
         "worker_impl.cc",
     ],
     hdrs = [
-        "benchmark_http_client.h",
+        "benchmark_client_impl.h",
         "client.h",
         "options_impl.h",
         "output_formatter_impl.h",

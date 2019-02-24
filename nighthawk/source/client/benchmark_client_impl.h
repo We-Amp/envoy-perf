@@ -9,8 +9,13 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/address.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/stats/store.h"
+//#include "envoy/stats/store.h"
+#include "common/stats/isolated_store_impl.h"
+
 #include "envoy/upstream/upstream.h"
+
+#include "nighthawk/client/benchmark_client.h"
+#include "nighthawk/common/sequencer.h"
 
 #include "nighthawk/source/client/stream_decoder.h"
 #include "nighthawk/source/common/statistic_impl.h"
@@ -19,27 +24,15 @@
 namespace Nighthawk {
 namespace Client {
 
-class BenchmarkHttpClient : public StreamDecoderCompletionCallback,
-                            public Envoy::Logger::Loggable<Envoy::Logger::Id::main>,
-                            public Envoy::Http::ConnectionPool::Callbacks {
+class BenchmarkHttpClient : public BenchmarkClient,
+                            public StreamDecoderCompletionCallback,
+                            public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
-  BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::Stats::Store& store,
-                      Envoy::TimeSource& time_source, const std::string& uri,
-                      Envoy::Http::HeaderMapImplPtr&& request_headers, bool use_h2);
+  BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,
+                      const std::string& uri, Envoy::Http::HeaderMapImplPtr&& request_headers,
+                      bool use_h2);
   ~BenchmarkHttpClient() override = default;
-
-  void initialize(Envoy::Runtime::LoaderImpl& runtime);
-  bool tryStartOne(std::function<void()> caller_completion_callback);
-
-  // ConnectionPool::Callbacks
-  void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason,
-                     Envoy::Upstream::HostDescriptionConstSharedPtr host) override;
-  void onPoolReady(Envoy::Http::StreamEncoder& encoder,
-                   Envoy::Upstream::HostDescriptionConstSharedPtr host) override;
-
-  // StreamDecoderCompletionCallback
-  void onComplete(bool success, const Envoy::Http::HeaderMap& headers) override;
 
   uint64_t pool_overflow_failures() { return pool_overflow_failures_; }
   uint64_t stream_reset_count() { return stream_reset_count_; }
@@ -55,21 +48,37 @@ public:
     allow_pending_for_test_ = allow_pending_for_test;
   }
 
-  const Statistic& responseStatistic() const { return response_statistic_; }
-  const Statistic& connectionStatistic() const { return connect_statistic_; }
-
   const Envoy::Http::HeaderMapImpl& request_headers() const { return *request_headers_; }
 
-  bool measureLatencies() const { return measure_latencies_; }
-  void setMeasureLatencies(bool measure_latencies) { measure_latencies_ = measure_latencies; }
+  // BenchmarkClient
+  void initialize(Envoy::Runtime::LoaderImpl& runtime) override;
+  void terminate() override { resetPool(); };
 
-  void resetPool() { pool_.reset(); }
+  const std::vector<std::tuple<std::string, const Statistic&>> statistics() const override {
+    std::vector<std::tuple<std::string, const Statistic&>> statistics;
+    statistics.push_back(
+        std::tuple<std::string, const Statistic&>{"Pool and connection setup", connect_statistic_});
+    statistics.push_back(
+        std::tuple<std::string, const Statistic&>{"Request to response", response_statistic_});
+    return statistics;
+  };
+  bool measureLatencies() const override { return measure_latencies_; }
+  void setMeasureLatencies(bool measure_latencies) override {
+    measure_latencies_ = measure_latencies;
+  }
+
+  bool tryStartOne(std::function<void()> caller_completion_callback) override;
+
+  // StreamDecoderCompletionCallback
+  void onComplete(bool success, const Envoy::Http::HeaderMap& headers) override;
+  void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) override;
 
 private:
   void syncResolveDns();
+  void resetPool() { pool_.reset(); }
 
   Envoy::Event::Dispatcher& dispatcher_;
-  Envoy::Stats::Store& store_;
+  Envoy::Stats::IsolatedStoreImpl store_;
   Envoy::TimeSource& time_source_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;

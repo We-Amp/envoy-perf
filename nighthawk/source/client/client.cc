@@ -16,6 +16,7 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/client/output_formatter_impl.h"
@@ -92,13 +93,29 @@ bool Main::run() {
   Envoy::Runtime::RandomGeneratorImpl generator;
   Envoy::Runtime::LoaderImpl runtime(generator, store, tls);
 
+  double global_interval = 1 / double(options_->requests_per_second()) / concurrency;
+
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerImplPtr> workers;
-  for (uint32_t i = 0; i < concurrency; i++) {
+  for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
     Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
-    workers.push_back(std::make_unique<WorkerImpl>(tls, std::move(dispatcher), /*runtime, store,*/
-                                                   thread_factory, *options_, i));
-    workers[i]->start();
+
+    auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
+        *dispatcher, *time_system_, options_->uri(), std::make_unique<Envoy::Http::HeaderMapImpl>(),
+        options_->h2());
+    benchmark_client->set_connection_timeout(options_->timeout());
+    benchmark_client->set_connection_limit(options_->connections());
+
+    // We try to offset the start of each thread so that workers will execute tasks evenly spaced
+    // in time.
+    uint64_t spread_us = static_cast<uint64_t>(global_interval * worker_number * 1000000);
+    workers.push_back(std::make_unique<WorkerImpl>(tls, std::move(dispatcher), thread_factory,
+                                                   *options_, worker_number, spread_us,
+                                                   std::move(benchmark_client)));
+  }
+
+  for (auto& w : workers) {
+    w->start();
   }
 
   for (auto& w : workers) {
@@ -113,10 +130,11 @@ bool Main::run() {
   for (auto& w : workers) {
     sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
     blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
+    auto benchmark_client_statistics = w->benchmark_client().statistics();
     connection_statistic =
-        connection_statistic->combine(w->benchmark_http_client().connectionStatistic());
+        connection_statistic->combine(std::get<1>(benchmark_client_statistics.front()));
     response_statistic =
-        response_statistic->combine(w->benchmark_http_client().responseStatistic());
+        response_statistic->combine(std::get<1>(benchmark_client_statistics.back()));
   }
 
   tls.shutdownGlobalThreading();
