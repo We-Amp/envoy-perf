@@ -85,7 +85,7 @@ bool Main::run() {
   }
 
   Envoy::Stats::IsolatedStoreImpl store;
-  Envoy::Api::Impl api(1000ms * 1000, thread_factory, store, *time_system_);
+  Envoy::Api::Impl api(thread_factory, store, *time_system_);
   Envoy::ThreadLocal::InstanceImpl tls;
   Envoy::Event::DispatcherPtr main_dispatcher(api.allocateDispatcher());
   // TODO(oschaaf): later on, fire up and use a main dispatcher loop as need arises.
