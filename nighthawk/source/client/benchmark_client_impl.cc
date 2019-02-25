@@ -7,7 +7,6 @@
 
 #include "absl/strings/str_split.h"
 
-#include "common/api/api_impl.h"
 #include "common/common/compiler_requirements.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
@@ -30,10 +29,11 @@ namespace Nighthawk {
 namespace Client {
 
 BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
-                                         Envoy::TimeSource& time_source, const std::string& uri,
+                                         Envoy::Event::TimeSystem& time_system,
+                                         const std::string& uri,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
                                          bool use_h2)
-    : dispatcher_(dispatcher), time_source_(time_source),
+    : dispatcher_(dispatcher), time_system_(time_system),
       request_headers_(std::move(request_headers)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
@@ -92,7 +92,7 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
   if (uri_->scheme() == "https") {
     socket_factory = Envoy::Network::TransportSocketFactoryPtr{
-        new Ssl::MClientSslSocketFactory(store_, time_source_, use_h2_)};
+        new Ssl::MClientSslSocketFactory(store_, time_system_, use_h2_)};
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };
@@ -136,7 +136,7 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
   }
 
   auto stream_decoder = new StreamDecoder(this, connect_statistic_, response_statistic_,
-                                          time_source_, std::move(caller_completion_callback),
+                                          time_system_, std::move(caller_completion_callback),
                                           *this, this->measureLatencies(), this->request_headers());
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *stream_decoder);

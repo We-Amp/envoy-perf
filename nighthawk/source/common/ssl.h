@@ -1,7 +1,19 @@
 
 #pragma once
 
-// TODO(oschaaf): this doesn't actually validate certs. FIX!!
+// TODO(oschaaf): discuss how to improve.
+// This class copies some ssl-related code from Envoy, to avoid a cascade of dependencies that would
+// slip in because of some of the constructors involved to do it otherwise.
+// It's also not cool that this doesn't validate certificates.
+// Notable is:
+//   TransportSocketFactoryContextImpl(Server::Admin& admin, Ssl::ContextManager& context_manager,
+//                                    Stats::Scope& stats_scope, Upstream::ClusterManager& cm,
+//                                    const LocalInfo::LocalInfo& local_info,
+//                                    Event::Dispatcher& dispatcher,
+//                                    Envoy::Runtime::RandomGenerator& random, Stats::Store& stats,
+//                                    Singleton::Manager& singleton_manager,
+//                                    ThreadLocal::SlotAllocator& tls, Api::Api& api)
+//
 
 #include "server/transport_socket_config_impl.h"
 
@@ -94,35 +106,26 @@ private:
 };
 
 class MClientSslSocketFactory : public Envoy::Network::TransportSocketFactory,
-                                public Envoy::Secret::SecretCallbacks,
                                 Envoy::Logger::Loggable<Envoy::Logger::Id::config> {
 public:
   MClientSslSocketFactory(Envoy::Stats::Store& store, Envoy::TimeSource& time_source, bool h2)
-      : config_(h2), scope_(store.createScope(fmt::format("cluster.{}.", "ssl-client"))) {
-    Envoy::Ssl::ClientContextSharedPtr context =
-        std::make_shared<Envoy::Extensions::TransportSockets::Tls::ClientContextImpl>(
-            *scope_, config_, time_source);
-    ssl_ctx_ = context;
-  }
+      : config_(h2), scope_(store.createScope("nighthawk.ssl-client.")),
+        ssl_ctx_(std::make_shared<Envoy::Extensions::TransportSockets::Tls::ClientContextImpl>(
+            *scope_, config_, time_source)) {}
 
   Envoy::Network::TransportSocketPtr createTransportSocket(
       Envoy::Network::TransportSocketOptionsSharedPtr transport_socket_options) const override {
-    Envoy::Ssl::ClientContextSharedPtr ssl_ctx = ssl_ctx_;
-    ASSERT(ssl_ctx);
     return std::make_unique<Envoy::Extensions::TransportSockets::Tls::SslSocket>(
-        std::move(ssl_ctx), Envoy::Extensions::TransportSockets::Tls::InitialState::Client,
-        transport_socket_options);
+        Envoy::Ssl::ClientContextSharedPtr{ssl_ctx_},
+        Envoy::Extensions::TransportSockets::Tls::InitialState::Client, transport_socket_options);
   }
 
   bool implementsSecureTransport() const override { return true; };
 
-  // Secret::SecretCallbacks
-  void onAddOrUpdateSecret() override { ENVOY_LOG(debug, "onAddOrUpdateSecret() called"); }
-
 private:
-  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_;
   MClientContextConfigImpl config_;
   Envoy::Stats::ScopePtr scope_;
+  Envoy::Ssl::ClientContextSharedPtr ssl_ctx_;
 };
 
 } // namespace Ssl

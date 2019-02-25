@@ -29,7 +29,7 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
-  BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::TimeSource& time_source,
+  BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::Event::TimeSystem& time_system,
                       const std::string& uri, Envoy::Http::HeaderMapImplPtr&& request_headers,
                       bool use_h2);
   ~BenchmarkHttpClient() override = default;
@@ -79,7 +79,7 @@ private:
 
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::Stats::IsolatedStoreImpl store_;
-  Envoy::TimeSource& time_source_;
+  Envoy::Event::TimeSystem& time_system_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   HdrStatistic response_statistic_;
