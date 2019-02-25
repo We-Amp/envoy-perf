@@ -34,8 +34,7 @@ class BenchmarkClientTest : public Envoy::BaseIntegrationTest,
 public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
-        time_system_(timeSystem()),
-        api_(1000ms /*flush interval*/, thread_factory_, store_, time_system_),
+        time_system_(timeSystem()), api_(thread_factory_, store_, time_system_),
         dispatcher_(api_.allocateDispatcher()), runtime_(generator_, store_, tls_) {}
 
   static void SetUpTestCase() {
