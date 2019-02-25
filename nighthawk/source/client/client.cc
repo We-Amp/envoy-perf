@@ -93,7 +93,11 @@ bool Main::run() {
   Envoy::Runtime::RandomGeneratorImpl generator;
   Envoy::Runtime::LoaderImpl runtime(generator, store, tls);
 
-  double global_interval = 1 / double(options_->requests_per_second()) / concurrency;
+  // We try to offset the start of each thread so that workers will execute tasks evenly
+  // spaced in time.
+  // E.g.if we have a 10 workers at 10k/second our global pacing is 100k/second (or 1 / 100 usec).
+  // We would then offset the worker starts like [0usec, 10 usec, ..., 90 usec].
+  double inter_worker_delay_usec = (1. / options_->requests_per_second()) * 1000000 / concurrency;
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerImplPtr> workers;
@@ -106,12 +110,9 @@ bool Main::run() {
     benchmark_client->set_connection_timeout(options_->timeout());
     benchmark_client->set_connection_limit(options_->connections());
 
-    // We try to offset the start of each thread so that workers will execute tasks evenly spaced
-    // in time.
-    uint64_t spread_us = static_cast<uint64_t>(global_interval * worker_number * 1000000);
-    workers.push_back(std::make_unique<WorkerImpl>(tls, std::move(dispatcher), thread_factory,
-                                                   *options_, worker_number, spread_us,
-                                                   std::move(benchmark_client)));
+    workers.push_back(std::make_unique<WorkerImpl>(
+        tls, std::move(dispatcher), thread_factory, *options_, worker_number,
+        inter_worker_delay_usec * worker_number, std::move(benchmark_client)));
   }
 
   for (auto& w : workers) {
