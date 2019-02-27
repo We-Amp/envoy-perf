@@ -27,12 +27,13 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::Store& store,
+                                         Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Event::TimeSystem& time_system,
                                          const std::string& uri,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
                                          bool use_h2)
-    : dispatcher_(dispatcher), time_system_(time_system),
+    : dispatcher_(dispatcher), store_(store), time_system_(time_system),
       request_headers_(std::move(request_headers)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
@@ -102,7 +103,7 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
 
   cluster_ = std::make_unique<Envoy::Upstream::ClusterInfoImpl>(
       cluster_config, bind_config, runtime, std::move(socket_factory),
-      store_.createScope("nighthawk.cluster"), false /*added_via_api*/);
+      store_.createScope("nighthawk."), false /*added_via_api*/);
 
   Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
       std::make_shared<Envoy::Network::ConnectionSocket::Options>();

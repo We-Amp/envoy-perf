@@ -31,9 +31,10 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
-  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                      Envoy::Event::TimeSystem& time_system, const std::string& uri,
-                      Envoy::Http::HeaderMapImplPtr&& request_headers, bool use_h2);
+  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::Store& store,
+                      Envoy::Event::Dispatcher& dispatcher, Envoy::Event::TimeSystem& time_system,
+                      const std::string& uri, Envoy::Http::HeaderMapImplPtr&& request_headers,
+                      bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
   uint64_t pool_overflow_failures() { return pool_overflow_failures_; }
@@ -80,7 +81,7 @@ private:
   void resetPool() { pool_.reset(); }
 
   Envoy::Event::Dispatcher& dispatcher_;
-  Envoy::Stats::IsolatedStoreImpl store_;
+  Envoy::Stats::Store& store_;
   Envoy::Event::TimeSystem& time_system_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;

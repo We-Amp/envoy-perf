@@ -75,17 +75,19 @@ public:
     tls_.shutdownGlobalThreading();
     ares_library_cleanup();
     test_server_.reset();
-    fake_upstreams_.clear();
+    // fake_upstreams_.clear();
   }
 
-  void testWithoutRequestQueue(std::string proto, bool use_h2) {
+  void testBasicFunctionality(bool use_https, bool use_h2, uint64_t good_responses,
+                              uint64_t connect_failures) {
     Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
     request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-    Client::BenchmarkHttpClient client(api_, *dispatcher_, time_system_,
-                                       fmt::format("{}://{}/", proto, getTestServerHostAndPort()),
-                                       std::move(request_headers), use_h2);
+    Client::BenchmarkHttpClient client(
+        api_, store_, *dispatcher_, time_system_,
+        fmt::format("{}://{}/", use_https ? "https" : "http", getTestServerHostAndPort()),
+        std::move(request_headers), use_h2);
 
-    client.set_connection_timeout(1s);
+    client.set_connection_timeout(10s);
     client.set_max_pending_requests(1);
     client.set_allow_pending_for_test(true);
     client.initialize(runtime_);
@@ -110,14 +112,13 @@ public:
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
-    EXPECT_EQ(0, inflight_response_count);
-    // TODO(oschaaf): benchark client has it's own isolated store.
-    EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
+    EXPECT_EQ(connect_failures, inflight_response_count);
+    EXPECT_EQ(connect_failures, store_.counter("nighthawk.upstream_cx_connect_fail").value());
     EXPECT_EQ(0, client.http_bad_response_count());
     EXPECT_EQ(0, client.stream_reset_count());
     // We throttle before the pool, so we expect no pool overflows.
     EXPECT_EQ(0, client.pool_overflow_failures());
-    EXPECT_EQ(1, client.http_good_response_count());
+    EXPECT_EQ(good_responses, client.http_good_response_count());
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
@@ -135,59 +136,17 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
                         testing::ValuesIn({Envoy::Network::Address::IpVersion::v4}),
                         Envoy::TestUtility::ipTestParamsToString);
 
-TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
-  Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
-  request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-  Client::BenchmarkHttpClient client(api_, *dispatcher_, time_system_,
-                                     fmt::format("http://{}/", getTestServerHostAndPort()),
-                                     std::move(request_headers), false /*use h2*/);
+TEST_P(BenchmarkClientTest, BasicTestH1) { testBasicFunctionality(false, false, 1, 0); }
 
-  int amount = 10;
-  int inflight_response_count = 0;
+TEST_P(BenchmarkClientTest, BasicTestHttpsH1) { testBasicFunctionality(true, false, 1, 0); }
 
-  // Allow  request queueing so we can queue up everything all at once.
-  client.set_connection_timeout(1s);
-  client.set_max_pending_requests(amount);
-  client.set_allow_pending_for_test(true);
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
 
-  // TODO(oschaaf): either get rid of the intialize call, or ensure that this throws
-  // when we didn't call it before calling tryStartOne().  client.initialize(runtime_);
-  client.initialize(runtime_);
+TEST_P(BenchmarkClientTest, BasicTestH2C) { testBasicFunctionality(false, true, 1, 0); }
 
-  std::function<void()> f = [this, &inflight_response_count]() {
-    if (--inflight_response_count == 0) {
-      dispatcher_->exit();
-    }
-  };
-
-  for (int i = 0; i < amount; i++) {
-    if (client.tryStartOne(f)) {
-      inflight_response_count++;
-    }
-  }
-
-  EXPECT_EQ(amount, inflight_response_count);
-  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
-
-  EXPECT_EQ(0, inflight_response_count);
-  // TODO(oschaaf): benchark client has its own isolated store.
-  EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
-  EXPECT_EQ(0, client.http_bad_response_count());
-  EXPECT_EQ(0, client.stream_reset_count());
-  EXPECT_EQ(0, client.pool_overflow_failures());
-  EXPECT_EQ(amount, client.http_good_response_count());
-}
-
-TEST_P(BenchmarkClientTest, BasicTestH1WithoutRequestQueue) {
-  testWithoutRequestQueue("http", false);
-}
-
-TEST_P(BenchmarkClientTest, BasicTestHttpsH1WithoutRequestQueue) {
-  testWithoutRequestQueue("https", false);
-}
-
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2WithoutRequestQueue) {
-  testWithoutRequestQueue("https", true);
+TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
+  test_server_.reset();
+  testBasicFunctionality(false, false, 0, 1);
 }
 
 } // namespace Nighthawk
