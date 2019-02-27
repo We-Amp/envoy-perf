@@ -32,8 +32,8 @@ envoy_cc_test(
     ],
     data = [
         "certs.sh",
-        "lorem_ipsum.txt",
         "test_data/hdr_proto_json.gold",
+        "test_data/lorem_ipsum.txt",
     ],
     repository = "@envoy",
     deps = [

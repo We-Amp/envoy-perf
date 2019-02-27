@@ -8,6 +8,7 @@
 #include "common/common/compiler_requirements.h"
 #include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
@@ -38,111 +39,19 @@ public:
         dispatcher_(api_.allocateDispatcher()), runtime_(generator_, store_, tls_) {}
 
   static void SetUpTestCase() {
-    // TODO(oschaaf): ask around how we should do this.
+    Envoy::Filesystem::InstanceImpl filesystem;
+
     Envoy::TestEnvironment::setEnvVar("TEST_TMPDIR", Envoy::TestEnvironment::temporaryDirectory(),
                                       1);
+
+    const std::string lorem_ipsum_content = filesystem.fileReadToEnd(
+        Envoy::TestEnvironment::runfilesPath("nighthawk/test/test_data/lorem_ipsum.txt"));
+    Envoy::TestEnvironment::writeStringToFileForTest("lorem_ipsum.txt", lorem_ipsum_content);
+
     Envoy::TestEnvironment::exec({Envoy::TestEnvironment::runfilesPath("nighthawk/test/certs.sh")});
 
-    const std::string body = R"EOF(
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam mauris felis, egestas eget turpis nec, ullamcorper laoreet magna. Donec ac condimentum lacus, nec semper eros. Sed iaculis arcu vitae egestas viverra. Nulla tempor, neque tempus tincidunt fermentum, orci nunc sagittis nisl, sed dapibus nunc ex sit amet justo. Ut porta pellentesque mi quis lobortis. Integer luctus, diam et mattis rhoncus, lacus orci condimentum tortor, vitae venenatis ante odio non massa. Duis ut nulla consectetur, elementum enim eu, maximus lacus. Ut id consequat libero. Mauris eget lorem et lorem iaculis laoreet a nec augue. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Maecenas ac cursus eros, ut eleifend lacus. Nam sit amet mauris nec mi luctus posuere. Phasellus ullamcorper vulputate purus sit amet dapibus. Mauris sit amet magna risus.
-
-Sed venenatis nulla non massa tempus consectetur. In eu suscipit mi, auctor faucibus augue. Phasellus blandit sagittis urna sed semper. Maecenas sem purus, laoreet gravida pretium non, malesuada vitae felis. Nam laoreet nisi non ipsum tincidunt facilisis. Donec ultrices a elit vel aliquam. Duis et diam eu urna ultrices dictum. Etiam non nulla eu velit feugiat ultrices ac vitae orci. In id posuere magna, vitae vulputate lectus. Vestibulum consectetur luctus neque ut cursus. Aliquam vel dapibus sem, vel rhoncus elit. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. In consequat ipsum arcu, eget ultricies tellus finibus id.
-
-Nam scelerisque viverra fermentum. Vivamus vitae tincidunt mauris. Cras id pretium lectus. Nunc ut leo vitae ligula dictum pretium. Proin et laoreet massa, sed pharetra ex. Nam nec pellentesque magna. Quisque lectus metus, ultrices eget nunc ac, blandit malesuada nulla. Nullam justo elit, eleifend eget elementum nec, convallis eu massa. Curabitur rhoncus pretium lorem et commodo. Morbi tincidunt lectus ut sodales pellentesque. Ut varius purus eget nunc ultricies congue.
-
-Aliquam posuere blandit mollis. Integer quis sollicitudin mi. Integer ac lobortis felis. Maecenas a molestie libero, vitae rhoncus lacus. Phasellus est nunc, faucibus facilisis velit in, lobortis faucibus neque. Sed varius faucibus tristique. Sed maximus libero justo, sit amet laoreet orci feugiat eget. Pellentesque aliquet enim ut facilisis vestibulum. In lacinia malesuada quam, vitae aliquet arcu pretium eu. Aliquam cursus facilisis feugiat. Fusce eu orci ornare, tempus purus ac, commodo leo. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Sed tempus elit eget pretium volutpat. Sed tincidunt dapibus tortor at blandit.
-
-Suspendisse vitae cursus elit. Sed pretium leo diam, ac semper nunc faucibus id. Sed pharetra, magna facilisis iaculis efficitur, nisl tortor vestibulum metus, id ultricies turpis arcu et odio. Suspendisse fringilla semper tincidunt. Cras at justo congue orci sodales efficitur. Donec quis sem ut dui efficitur faucibus. Pellentesque dapibus lacinia elit, sit amet volutpat velit gravida lobortis. Sed at purus eros. Pellentesque sodales, nulla at tincidunt placerat, massa metus facilisis nibh, non posuere ipsum metus a nisl. Duis nibh urna, laoreet quis interdum sed, tempor vel risus. Fusce tincidunt felis quis tincidunt luctus. Mauris vehicula ipsum magna, sed placerat ligula feugiat in. Curabitur pretium arcu magna, nec iaculis massa fermentum a.      
-)EOF";
-
-    const std::string file_path =
-        Envoy::TestEnvironment::writeStringToFileForTest("lorem_ipsum.txt", body);
-
-    lorem_ipsum_config = R"EOF(
-admin:
-  access_log_path: /dev/null
-  address:
-    socket_address:
-      address: 127.0.0.1
-      port_value: 0
-static_resources:
-  clusters:
-    name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
-  listeners:
-  # define an origin server on :10000 that always returns "lorem ipsum..."
-    - name: listener_0
-      address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 0
-      filter_chains:
-      - filters:
-        - name: envoy.http_connection_manager
-          config: 
-            generate_request_id: false
-            codec_type: auto
-            stat_prefix: ingress_http
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: service
-                domains:
-                - "*"
-                routes:
-                - match:
-                    prefix: /
-                  direct_response:
-                    status: 200
-                    body:
-                      filename: {{ test_tmpdir }}/lorem_ipsum.txt
-            http_filters:
-            - name: envoy.router
-              config:
-                dynamic_stats: false
-    - name: listener_1
-      address:
-        socket_address:
-          address: 127.0.0.1
-          port_value: 0
-      filter_chains:
-      - filters:
-        - name: envoy.http_connection_manager
-          config: 
-            generate_request_id: false
-            codec_type: auto
-            stat_prefix: ingress_http
-            route_config:
-              name: local_route
-              virtual_hosts:
-              - name: service
-                domains:
-                - "*"
-                routes:
-                - match:
-                    prefix: /
-                  direct_response:
-                    status: 200
-                    body:
-                      filename: {{ test_tmpdir }}/lorem_ipsum.txt
-            http_filters:
-            - name: envoy.router
-              config:
-                dynamic_stats: false
-        tls_context:
-          common_tls_context:
-            tls_certificates:
-              certificate_chain:
-                filename: "{{ test_tmpdir }}/unittestcert.pem"
-              private_key:
-                filename: "{{ test_tmpdir }}/unittestkey.pem"
-            validation_context:
-              trusted_ca:
-                filename: "{{ test_tmpdir }}/ca_cert.pem"
-)EOF";
+    lorem_ipsum_config = filesystem.fileReadToEnd(Envoy::TestEnvironment::runfilesPath(
+        "nighthawk/test/test_data/benchmark_http_client_test_envoy.yaml"));
     lorem_ipsum_config = Envoy::TestEnvironment::substitute(lorem_ipsum_config);
   }
 
@@ -167,6 +76,48 @@ static_resources:
     ares_library_cleanup();
     test_server_.reset();
     fake_upstreams_.clear();
+  }
+
+  void testWithoutRequestQueue(std::string proto, bool use_h2) {
+    Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
+    request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
+    Client::BenchmarkHttpClient client(api_, *dispatcher_, time_system_,
+                                       fmt::format("{}://{}/", proto, getTestServerHostAndPort()),
+                                       std::move(request_headers), use_h2);
+
+    client.set_connection_timeout(1s);
+    client.set_max_pending_requests(1);
+    client.set_allow_pending_for_test(true);
+    client.initialize(runtime_);
+
+    uint64_t amount = 10;
+    uint64_t inflight_response_count = 0;
+
+    std::function<void()> f = [this, &inflight_response_count]() {
+      --inflight_response_count;
+      if (inflight_response_count == 0) {
+        dispatcher_->exit();
+      }
+    };
+
+    for (uint64_t i = 0; i < amount; i++) {
+      if (client.tryStartOne(f)) {
+        inflight_response_count++;
+      }
+    }
+
+    EXPECT_EQ(1, inflight_response_count);
+
+    dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+
+    EXPECT_EQ(0, inflight_response_count);
+    // TODO(oschaaf): benchark client has it's own isolated store.
+    EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
+    EXPECT_EQ(0, client.http_bad_response_count());
+    EXPECT_EQ(0, client.stream_reset_count());
+    // We throttle before the pool, so we expect no pool overflows.
+    EXPECT_EQ(0, client.pool_overflow_failures());
+    EXPECT_EQ(1, client.http_good_response_count());
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
@@ -219,7 +170,7 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(0, inflight_response_count);
-  // TODO(oschaaf): benchark client has it's own isolated store.
+  // TODO(oschaaf): benchark client has its own isolated store.
   EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
   EXPECT_EQ(0, client.http_bad_response_count());
   EXPECT_EQ(0, client.stream_reset_count());
@@ -228,80 +179,15 @@ TEST_P(BenchmarkClientTest, BasicTestH1WithRequestQueue) {
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH1WithoutRequestQueue) {
-  Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
-  request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-  Client::BenchmarkHttpClient client(api_, *dispatcher_, time_system_,
-                                     fmt::format("http://{}/", getTestServerHostAndPort()),
-                                     std::move(request_headers), false /*use h2*/);
-
-  client.set_connection_timeout(1s);
-  client.set_max_pending_requests(1);
-  client.set_allow_pending_for_test(true);
-  client.initialize(runtime_);
-
-  uint64_t amount = 10;
-  uint64_t inflight_response_count = 0;
-
-  std::function<void()> f = [this, &inflight_response_count]() {
-    --inflight_response_count;
-    if (inflight_response_count == 0) {
-      dispatcher_->exit();
-    }
-  };
-
-  for (uint64_t i = 0; i < amount; i++) {
-    if (client.tryStartOne(f)) {
-      inflight_response_count++;
-    }
-  }
-
-  EXPECT_EQ(1, inflight_response_count);
-
-  dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
-
-  EXPECT_EQ(0, inflight_response_count);
-  // TODO(oschaaf): benchark client has it's own isolated store.
-  EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
-  EXPECT_EQ(0, client.http_bad_response_count());
-  EXPECT_EQ(0, client.stream_reset_count());
-  // We throttle before the pool, so we expect no pool overflows.
-  EXPECT_EQ(0, client.pool_overflow_failures());
-  EXPECT_EQ(1, client.http_good_response_count());
+  testWithoutRequestQueue("http", false);
 }
 
-// TODO(oschaaf): figure out if we can use simulated time in this test to eliminate flake chances,
-// and speed up execution.
-TEST_P(BenchmarkClientTest, DISABLED_SequencedH2Test) {
-  Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
-  request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
+TEST_P(BenchmarkClientTest, BasicTestHttpsH1WithoutRequestQueue) {
+  testWithoutRequestQueue("https", false);
+}
 
-  Client::BenchmarkHttpClient client(api_, *dispatcher_, time_system_,
-                                     fmt::format("https://{}/", getTestServerHostAndSslPort()),
-                                     std::move(request_headers), true /*use h2*/);
-  client.initialize(runtime_);
-
-  SequencerTarget f =
-      std::bind(&Client::BenchmarkHttpClient::tryStartOne, &client, std::placeholders::_1);
-
-  LinearRateLimiter rate_limiter(time_system_, 1_Hz);
-  std::chrono::milliseconds duration(5999ms);
-  PlatformUtilImpl platform_util;
-  SequencerImpl sequencer(platform_util, *dispatcher_, time_system_, rate_limiter, f, duration,
-                          10s);
-
-  sequencer.start();
-  sequencer.waitForCompletion();
-
-  // TODO(oschaaf): benchark client has it's own isolated store.
-  EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_connect_fail").value());
-  EXPECT_EQ(0, client.http_bad_response_count());
-  EXPECT_EQ(0, client.stream_reset_count());
-  EXPECT_EQ(0, client.pool_overflow_failures());
-
-  // We expect all responses to get in within the 999 ms slack we gave it.
-  // TODO(oschaaf): under valgrind, on some systems, we overshoot here,
-  // hence the EXPECT_LE.
-  EXPECT_LE(5, client.http_good_response_count());
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2WithoutRequestQueue) {
+  testWithoutRequestQueue("https", true);
 }
 
 } // namespace Nighthawk
