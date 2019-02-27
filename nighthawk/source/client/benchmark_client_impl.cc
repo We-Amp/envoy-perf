@@ -118,7 +118,7 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
     pool_ = std::make_unique<Envoy::Http::Http2::ProdConnPoolImpl>(
         dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
   } else {
-    pool_ = std::make_unique<Envoy::Http::Http1::ConnPoolImplProd>(
+    pool_ = std::make_unique<Envoy::Http::Http1::ProdConnPoolImpl>(
         dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
   }
 }
