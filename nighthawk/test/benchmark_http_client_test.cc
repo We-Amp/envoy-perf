@@ -152,7 +152,7 @@ TEST_P(BenchmarkClientTest, BasicTestH1) { testBasicFunctionality(false, false, 
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) { testBasicFunctionality(true, false, 1, 0); }
 
-TEST_P(BenchmarkClientTest, BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
 
 TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2C) { testBasicFunctionality(false, true, 1, 0); }
 
