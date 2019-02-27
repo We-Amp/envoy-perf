@@ -12,7 +12,7 @@
 
 using namespace std::chrono_literals;
 
-constexpr std::chrono::milliseconds TimeResolution = 10ms;
+constexpr std::chrono::milliseconds TimeResolution = 1ms;
 
 namespace Nighthawk {
 
@@ -34,7 +34,7 @@ public:
   ~MockPlatformUtil();
 
   MOCK_CONST_METHOD0(yieldCurrentThread, void());
-  void yieldFromBaseClass() const;
+  void yieldWithSimulatedTime() const;
 
 private:
   void delegateToSimulatedTimeAwarePlatformUtil();
