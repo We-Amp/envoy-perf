@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common/api/api_impl.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/runtime/runtime_impl.h"
@@ -18,6 +19,7 @@
 #include "nighthawk/common/sequencer.h"
 
 #include "nighthawk/source/client/stream_decoder.h"
+#include "nighthawk/source/common/ssl.h"
 #include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/utility.h"
 
@@ -29,9 +31,9 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
-  BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher, Envoy::Event::TimeSystem& time_system,
-                      const std::string& uri, Envoy::Http::HeaderMapImplPtr&& request_headers,
-                      bool use_h2);
+  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+                      Envoy::Event::TimeSystem& time_system, const std::string& uri,
+                      Envoy::Http::HeaderMapImplPtr&& request_headers, bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
   uint64_t pool_overflow_failures() { return pool_overflow_failures_; }
@@ -104,6 +106,7 @@ private:
   uint64_t requests_initiated_;
   bool allow_pending_for_test_;
   bool measure_latencies_;
+  Ssl::MinimalTransportSocketFactoryContext factory_context_;
 };
 
 } // namespace Client

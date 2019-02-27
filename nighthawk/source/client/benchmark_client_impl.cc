@@ -20,7 +20,6 @@
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "nighthawk/source/client/stream_decoder.h"
-#include "nighthawk/source/common/ssl.h"
 #include "nighthawk/source/common/statistic_impl.h"
 
 using namespace std::chrono_literals;
@@ -28,7 +27,7 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
+BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Event::TimeSystem& time_system,
                                          const std::string& uri,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
@@ -39,7 +38,9 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Event::Dispatcher& dispatcher,
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
       requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false),
-      measure_latencies_(false) {
+      measure_latencies_(false),
+      factory_context_(time_system_, store_.createScope("nighthawk.transport"), dispatcher_,
+                       generator_, store_, api) {
   ASSERT(uri_->isValid());
   request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(uri_->path());
@@ -85,21 +86,23 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
   thresholds->mutable_max_connections()->set_value(connection_limit_);
   thresholds->mutable_max_pending_requests()->set_value(max_pending_requests_);
 
-  Envoy::Stats::ScopePtr scope = store_.createScope(fmt::format(
-      "nighthawk.{}", cluster_config.alt_stat_name().empty() ? cluster_config.name()
-                                                             : cluster_config.alt_stat_name()));
-
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
+
   if (uri_->scheme() == "https") {
-    socket_factory = Envoy::Network::TransportSocketFactoryPtr{
-        new Ssl::MClientSslSocketFactory(store_, time_system_, use_h2_)};
+    if (use_h2_) {
+      auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
+      common_tls_context->add_alpn_protocols("h2");
+    }
+
+    socket_factory =
+        Envoy::Upstream::createTransportSocketFactory(cluster_config, factory_context_);
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };
 
   cluster_ = std::make_unique<Envoy::Upstream::ClusterInfoImpl>(
-      cluster_config, bind_config, runtime, std::move(socket_factory), std::move(scope),
-      false /*added_via_api*/);
+      cluster_config, bind_config, runtime, std::move(socket_factory),
+      store_.createScope("nighthawk.cluster"), false /*added_via_api*/);
 
   Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
       std::make_shared<Envoy::Network::ConnectionSocket::Options>();

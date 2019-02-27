@@ -105,8 +105,8 @@ bool Main::run() {
     Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
 
     auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
-        *dispatcher, *time_system_, options_->uri(), std::make_unique<Envoy::Http::HeaderMapImpl>(),
-        options_->h2());
+        api, *dispatcher, *time_system_, options_->uri(),
+        std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
     benchmark_client->set_connection_timeout(options_->timeout());
     benchmark_client->set_connection_limit(options_->connections());
 
