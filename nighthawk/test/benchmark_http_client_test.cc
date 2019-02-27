@@ -19,6 +19,11 @@
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
 
+#include "test/mocks/runtime/mocks.h"
+#include "test/mocks/thread_local/mocks.h"
+
+#include "test/integration/http_integration.h"
+
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
 #include "test/server/utility.h"
@@ -36,7 +41,7 @@ public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
         time_system_(timeSystem()), api_(thread_factory_, store_, time_system_),
-        dispatcher_(api_.allocateDispatcher()), runtime_(generator_, store_, tls_) {}
+        dispatcher_(api_.allocateDispatcher()) /*, runtime_(generator_, store_, tls_)*/ {}
 
   static void SetUpTestCase() {
     Envoy::Filesystem::InstanceImpl filesystem;
@@ -58,6 +63,8 @@ public:
   void SetUp() override {
     ares_library_init(ARES_LIB_INIT_ALL);
     Envoy::Event::Libevent::Global::initialize();
+
+    // defer_listener_finalization_ = true;
     BaseIntegrationTest::initialize();
   }
 
@@ -75,7 +82,7 @@ public:
     tls_.shutdownGlobalThreading();
     ares_library_cleanup();
     test_server_.reset();
-    // fake_upstreams_.clear();
+    fake_upstreams_.clear();
   }
 
   void testBasicFunctionality(bool use_https, bool use_h2, uint64_t good_responses,
@@ -127,8 +134,13 @@ public:
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
+  // testing::NiceMock<Envoy::ThreadLocal::MockInstance> tls_;
+
   Envoy::ThreadLocal::InstanceImpl tls_;
-  Envoy::Runtime::LoaderImpl runtime_;
+
+  ::testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
+
+  // Envoy::Runtime::LoaderImpl runtime_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
@@ -140,11 +152,12 @@ TEST_P(BenchmarkClientTest, BasicTestH1) { testBasicFunctionality(false, false, 
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) { testBasicFunctionality(true, false, 1, 0); }
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
+TEST_P(BenchmarkClientTest, BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
 
-TEST_P(BenchmarkClientTest, BasicTestH2C) { testBasicFunctionality(false, true, 1, 0); }
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2C) { testBasicFunctionality(false, true, 1, 0); }
 
 TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
+  // Kill the test server, so we can't connect.
   test_server_.reset();
   testBasicFunctionality(false, false, 0, 1);
 }

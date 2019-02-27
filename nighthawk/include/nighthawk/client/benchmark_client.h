@@ -1,6 +1,6 @@
 #pragma once
 
-#include "common/runtime/runtime_impl.h"
+#include "envoy/runtime/runtime.h"
 
 #include "nighthawk/common/statistic.h"
 
@@ -15,7 +15,7 @@ public:
    * Initialize will be called on the worker thread after it has started.
    * @param runtime
    */
-  virtual void initialize(Envoy::Runtime::LoaderImpl& runtime) PURE;
+  virtual void initialize(Envoy::Runtime::Loader& runtime) PURE;
 
   virtual void terminate() PURE;
 

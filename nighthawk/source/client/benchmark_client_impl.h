@@ -1,19 +1,19 @@
 #pragma once
 
-#include "common/api/api_impl.h"
-#include "common/common/logger.h"
-#include "common/http/header_map_impl.h"
-#include "common/runtime/runtime_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/address.h"
 #include "envoy/runtime/runtime.h"
-//#include "envoy/stats/store.h"
-#include "common/stats/isolated_store_impl.h"
-
 #include "envoy/upstream/upstream.h"
+//#include "envoy/stats/store.h"
+
+#include "common/api/api_impl.h"
+#include "common/common/logger.h"
+#include "common/http/header_map_impl.h"
+#include "common/runtime/runtime_impl.h"
+#include "common/stats/isolated_store_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
 #include "nighthawk/common/sequencer.h"
@@ -54,7 +54,7 @@ public:
   const Envoy::Http::HeaderMapImpl& request_headers() const { return *request_headers_; }
 
   // BenchmarkClient
-  void initialize(Envoy::Runtime::LoaderImpl& runtime) override;
+  void initialize(Envoy::Runtime::Loader& runtime) override;
   void terminate() override { resetPool(); };
 
   const std::vector<std::tuple<std::string, const Statistic&>> statistics() const override {

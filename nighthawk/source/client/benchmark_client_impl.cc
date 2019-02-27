@@ -15,7 +15,7 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/runtime/runtime_impl.h"
+// #include "common/runtime/runtime_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -73,7 +73,7 @@ void BenchmarkHttpClient::syncResolveDns() {
   dispatcher_.run(Envoy::Event::Dispatcher::RunType::Block);
 }
 
-void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
+void BenchmarkHttpClient::initialize(Envoy::Runtime::Loader& runtime) {
   syncResolveDns();
 
   envoy::api::v2::Cluster cluster_config;
@@ -89,12 +89,12 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::LoaderImpl& runtime) {
 
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
+  if (use_h2_) {
+    auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
+    common_tls_context->add_alpn_protocols("h2");
+  }
+  // TODO(oschaaf): h2c
   if (uri_->scheme() == "https") {
-    if (use_h2_) {
-      auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
-      common_tls_context->add_alpn_protocols("h2");
-    }
-
     socket_factory =
         Envoy::Upstream::createTransportSocketFactory(cluster_config, factory_context_);
   } else {
