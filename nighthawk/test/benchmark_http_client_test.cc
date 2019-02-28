@@ -41,7 +41,7 @@ public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
         time_system_(timeSystem()), api_(thread_factory_, store_, time_system_),
-        dispatcher_(api_.allocateDispatcher()) /*, runtime_(generator_, store_, tls_)*/ {}
+        dispatcher_(api_.allocateDispatcher()) {}
 
   static void SetUpTestCase() {
     Envoy::Filesystem::InstanceImpl filesystem;
@@ -63,8 +63,6 @@ public:
   void SetUp() override {
     ares_library_init(ARES_LIB_INIT_ALL);
     Envoy::Event::Libevent::Global::initialize();
-
-    // defer_listener_finalization_ = true;
     BaseIntegrationTest::initialize();
   }
 
@@ -85,8 +83,10 @@ public:
     fake_upstreams_.clear();
   }
 
-  void testBasicFunctionality(bool use_https, bool use_h2, uint64_t good_responses,
-                              uint64_t connect_failures) {
+  void testBasicFunctionality(bool allow_pending, uint64_t max_pending, uint64_t connection_limit,
+                              bool use_https, bool use_h2, uint64_t amount_of_request,
+                              uint64_t expected_good_responses,
+                              uint64_t expected_connect_failures) {
     Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
     request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
     Client::BenchmarkHttpClient client(
@@ -95,11 +95,12 @@ public:
         std::move(request_headers), use_h2);
 
     client.set_connection_timeout(10s);
-    client.set_max_pending_requests(1);
-    client.set_allow_pending_for_test(true);
+    client.set_allow_pending_for_test(allow_pending);
+    client.set_max_pending_requests(max_pending);
+    client.set_connection_limit(connection_limit);
     client.initialize(runtime_);
 
-    uint64_t amount = 10;
+    uint64_t amount = amount_of_request;
     uint64_t inflight_response_count = 0;
 
     std::function<void()> f = [this, &inflight_response_count]() {
@@ -115,17 +116,20 @@ public:
       }
     }
 
-    EXPECT_EQ(1, inflight_response_count);
+    EXPECT_EQ(allow_pending ? amount : 1, inflight_response_count);
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
-    EXPECT_EQ(connect_failures, inflight_response_count);
-    EXPECT_EQ(connect_failures, store_.counter("nighthawk.upstream_cx_connect_fail").value());
+    EXPECT_EQ(expected_connect_failures, inflight_response_count);
+    EXPECT_EQ(expected_connect_failures,
+              store_.counter("nighthawk.upstream_cx_connect_fail").value());
+    EXPECT_EQ(0, store_.counter("nighthawk.cx_connect_attempts_exceeded").value());
+    EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_overflow").value());
     EXPECT_EQ(0, client.http_bad_response_count());
     EXPECT_EQ(0, client.stream_reset_count());
     // We throttle before the pool, so we expect no pool overflows.
     EXPECT_EQ(0, client.pool_overflow_failures());
-    EXPECT_EQ(good_responses, client.http_good_response_count());
+    EXPECT_EQ(expected_good_responses, client.http_good_response_count());
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
@@ -134,13 +138,8 @@ public:
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
-  // testing::NiceMock<Envoy::ThreadLocal::MockInstance> tls_;
-
   Envoy::ThreadLocal::InstanceImpl tls_;
-
   ::testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
-
-  // Envoy::Runtime::LoaderImpl runtime_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
@@ -148,18 +147,39 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
                         testing::ValuesIn({Envoy::Network::Address::IpVersion::v4}),
                         Envoy::TestUtility::ipTestParamsToString);
 
-TEST_P(BenchmarkClientTest, BasicTestH1) { testBasicFunctionality(false, false, 1, 0); }
+// TODO(oschaaf): this is kind of write-only code, it's not possible to understand the tests
+// based on the args we pass to testBasicfunctionality(). Fix this by adding comments.
 
-TEST_P(BenchmarkClientTest, BasicTestHttpsH1) { testBasicFunctionality(true, false, 1, 0); }
+TEST_P(BenchmarkClientTest, BasicTestH1) {
+  testBasicFunctionality(false, 1, 1, false, false, 10, 1, 0);
+}
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) { testBasicFunctionality(true, true, 1, 0); }
+TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
+  testBasicFunctionality(false, 1, 1, true, false, 10, 1, 0);
+}
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2C) { testBasicFunctionality(false, true, 1, 0); }
+// The following two are disabled because of trouble with runtime initialization, causing them
+// to crash out.
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) {
+  testBasicFunctionality(false, 1, 1, true, true, 10, 1, 0);
+}
+
+TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2C) {
+  testBasicFunctionality(false, 1, 1, false, true, 10, 1, 0);
+}
 
 TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
   // Kill the test server, so we can't connect.
+  // We allow a single connection and no pending. We expect one connection failure.
   test_server_.reset();
-  testBasicFunctionality(false, false, 0, 1);
+  testBasicFunctionality(false, 1, 1, false, false, 10, 0, 1);
+}
+
+TEST_P(BenchmarkClientTest, H1MultiConnectionFailure) {
+  // Kill the test server, so we can't connect.
+  // We allow a ten connections and ten pending requests. We expect ten connection failures.
+  test_server_.reset();
+  testBasicFunctionality(true, 10, 10, false, false, 10, 0, 10);
 }
 
 } // namespace Nighthawk
