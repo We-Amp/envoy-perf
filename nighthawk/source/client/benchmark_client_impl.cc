@@ -15,7 +15,7 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-// #include "common/runtime/runtime_impl.h"
+#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
@@ -27,27 +27,23 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::StorePtr&& store,
-                                         Envoy::Event::Dispatcher& dispatcher,
+BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Event::TimeSystem& time_system,
-                                         const std::string& uri,
-                                         Envoy::Http::HeaderMapImplPtr&& request_headers,
-                                         bool use_h2)
-    : dispatcher_(dispatcher), store_(std::move(store)), time_system_(time_system),
-      request_headers_(std::move(request_headers)), use_h2_(use_h2),
-      uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
-      connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
-      stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      allow_pending_for_test_(false), measure_latencies_(false),
+                                         const std::string& uri, bool use_h2)
+    : dispatcher_(dispatcher), store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
+      time_system_(time_system), use_h2_(use_h2), uri_(std::make_unique<Uri>(Uri::Parse(uri))),
+      dns_failure_(true), timeout_(5s), connection_limit_(1), max_pending_requests_(1),
+      pool_overflow_failures_(0), stream_reset_count_(0), requests_completed_(0),
+      requests_initiated_(0), allow_pending_for_test_(false), measure_latencies_(false),
       transport_socket_factory_context_(time_system_, store_->createScope("transport."),
                                         dispatcher_, generator_, *store_, api) {
   ASSERT(uri_->isValid());
-  request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-  request_headers_->insertPath().value(uri_->path());
-  request_headers_->insertHost().value(uri_->host_and_port());
-  request_headers_->insertScheme().value(uri_->scheme() == "https"
-                                             ? Envoy::Http::Headers::get().SchemeValues.Https
-                                             : Envoy::Http::Headers::get().SchemeValues.Http);
+  request_headers_.insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
+  request_headers_.insertPath().value(uri_->path());
+  request_headers_.insertHost().value(uri_->host_and_port());
+  request_headers_.insertScheme().value(uri_->scheme() == "https"
+                                            ? Envoy::Http::Headers::get().SchemeValues.Https
+                                            : Envoy::Http::Headers::get().SchemeValues.Http);
 }
 
 void BenchmarkHttpClient::syncResolveDns() {
@@ -139,7 +135,7 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
 
   auto stream_decoder = new StreamDecoder(this, connect_statistic_, response_statistic_,
                                           time_system_, std::move(caller_completion_callback),
-                                          *this, this->measureLatencies(), this->request_headers());
+                                          *this, measureLatencies(), request_headers_);
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *stream_decoder);
 

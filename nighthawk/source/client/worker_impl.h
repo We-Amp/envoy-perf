@@ -1,10 +1,11 @@
 #pragma once
 
+#include "envoy/api/api.h"
+#include "envoy/event/timer.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/logger.h"
 #include "common/common/thread_impl.h"
-#include "common/event/real_time_system.h"
 #include "common/runtime/runtime_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
@@ -17,8 +18,7 @@ namespace Client {
 
 class WorkerImpl : Worker {
 public:
-  WorkerImpl(Envoy::Thread::ThreadFactory& thread_factory, Envoy::ThreadLocal::Instance& tls,
-             Envoy::Event::DispatcherPtr&& dispatcher, Envoy::Stats::StorePtr&& store);
+  WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls);
   ~WorkerImpl() override;
 
   void start() override;
@@ -31,7 +31,7 @@ protected:
   std::unique_ptr<Envoy::Stats::Store> store_;
   std::unique_ptr<Envoy::Runtime::LoaderImpl> runtime_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
-  Envoy::Event::RealTimeSystem time_system_;
+  std::unique_ptr<Envoy::Event::TimeSystem> time_system_;
 
 private:
   Envoy::Thread::ThreadPtr thread_;
@@ -41,10 +41,8 @@ private:
 
 class WorkerClientImpl : public WorkerImpl, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  WorkerClientImpl(Envoy::Thread::ThreadFactory& thread_factory, Envoy::ThreadLocal::Instance& tls,
-                   Envoy::Event::DispatcherPtr&& dispatcher, Envoy::Stats::StorePtr&& store,
-                   const Options& options, int worker_number, uint64_t start_delay_usec,
-                   std::unique_ptr<BenchmarkClient>&& benchmark_client);
+  WorkerClientImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls, const Options& options,
+                   int worker_number, uint64_t start_delay_usec);
 
   // TODO(oschaaf): get rid of these.
   const Sequencer& sequencer() const override;

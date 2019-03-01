@@ -86,12 +86,10 @@ public:
   void testBasicFunctionality(std::string uriPath, bool allow_pending, uint64_t max_pending,
                               uint64_t connection_limit, bool use_https, bool use_h2,
                               uint64_t amount_of_request) {
-    Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
-    request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
-        api_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher_, time_system_,
+        api_, *dispatcher_, time_system_,
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
-        std::move(request_headers), use_h2);
+        use_h2);
 
     client_->set_connection_timeout(10s);
     client_->set_allow_pending_for_test(allow_pending);

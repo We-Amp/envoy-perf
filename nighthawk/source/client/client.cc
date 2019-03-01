@@ -16,7 +16,6 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/client/output_formatter_impl.h"
@@ -101,18 +100,8 @@ bool Main::run() {
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerClientImplPtr> workers;
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
-    Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
-
-    auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
-        api, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher, *time_system_,
-        options_->uri(), std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
-    benchmark_client->set_connection_timeout(options_->timeout());
-    benchmark_client->set_connection_limit(options_->connections());
-
-    workers.push_back(std::make_unique<WorkerClientImpl>(
-        thread_factory, tls, std::move(dispatcher),
-        std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *options_, worker_number,
-        inter_worker_delay_usec * worker_number, std::move(benchmark_client)));
+    workers.push_back(std::make_unique<WorkerClientImpl>(api, tls, *options_, worker_number,
+                                                         inter_worker_delay_usec * worker_number));
   }
 
   for (auto& w : workers) {
@@ -128,16 +117,17 @@ bool Main::run() {
   std::unique_ptr<Statistic> connection_statistic = std::make_unique<HdrStatistic>();
   std::unique_ptr<Statistic> response_statistic = std::make_unique<HdrStatistic>();
 
-  for (auto& w : workers) {
-    sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
-    blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
-    auto benchmark_client_statistics = w->benchmark_client().statistics();
-    connection_statistic =
-        connection_statistic->combine(std::get<1>(benchmark_client_statistics.front()));
-    response_statistic =
-        response_statistic->combine(std::get<1>(benchmark_client_statistics.back()));
-  }
-
+  /*
+    for (auto& w : workers) {
+      sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
+      blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
+      auto benchmark_client_statistics = w->benchmark_client().statistics();
+      connection_statistic =
+          connection_statistic->combine(std::get<1>(benchmark_client_statistics.front()));
+      response_statistic =
+          response_statistic->combine(std::get<1>(benchmark_client_statistics.back()));
+    }
+  */
   tls.shutdownGlobalThreading();
 
   if (blocked_statistic->count() > 0) {
