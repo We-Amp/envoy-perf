@@ -31,6 +31,12 @@ public:
    * @return const Sequencer&
    */
   virtual const Sequencer& sequencer() const PURE;
+
+protected:
+  /**
+   * Perform the actual work on the thread.
+   */
+  virtual void work() PURE;
 };
 
 typedef std::unique_ptr<Worker> WorkerPtr;

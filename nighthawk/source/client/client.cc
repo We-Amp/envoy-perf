@@ -99,7 +99,7 @@ bool Main::run() {
   double inter_worker_delay_usec = (1. / options_->requests_per_second()) * 1000000 / concurrency;
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
-  std::vector<WorkerImplPtr> workers;
+  std::vector<WorkerClientImplPtr> workers;
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
     Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
 
@@ -109,8 +109,8 @@ bool Main::run() {
     benchmark_client->set_connection_timeout(options_->timeout());
     benchmark_client->set_connection_limit(options_->connections());
 
-    workers.push_back(std::make_unique<WorkerImpl>(
-        tls, std::move(dispatcher), thread_factory,
+    workers.push_back(std::make_unique<WorkerClientImpl>(
+        thread_factory, tls, std::move(dispatcher),
         std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *options_, worker_number,
         inter_worker_delay_usec * worker_number, std::move(benchmark_client)));
   }

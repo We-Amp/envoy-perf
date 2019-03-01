@@ -12,15 +12,11 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-// TODO(oschaaf): Fix argument ordering here.
-WorkerImpl::WorkerImpl(Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
-                       Envoy::Thread::ThreadFactory& thread_factory, Envoy::Stats::StorePtr&& store,
-                       const Options& options, int worker_number, uint64_t start_delay_usec,
-                       std::unique_ptr<BenchmarkClient>&& benchmark_client)
-    : tls_(tls), dispatcher_(std::move(dispatcher)), thread_factory_(thread_factory),
-      store_(std::move(store)), worker_number_(worker_number), start_delay_usec_(start_delay_usec),
-      options_(options), started_(false), completed_(false),
-      benchmark_client_(std::move(benchmark_client)) {
+WorkerImpl::WorkerImpl(Envoy::Thread::ThreadFactory& thread_factory,
+                       Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
+                       Envoy::Stats::StorePtr&& store)
+    : thread_factory_(thread_factory), dispatcher_(std::move(dispatcher)), tls_(tls),
+      store_(std::move(store)), started_(false), completed_(false) {
   tls_.registerThread(*dispatcher_, false);
   runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, *store_, tls_);
 }
@@ -32,7 +28,24 @@ void WorkerImpl::start() {
   started_ = true;
   thread_ = thread_factory_.createThread([this]() { work(); });
 }
-void WorkerImpl::work() {
+
+void WorkerImpl::waitForCompletion() {
+  ASSERT(started_ && !completed_);
+  completed_ = true;
+  thread_->join();
+}
+
+WorkerClientImpl::WorkerClientImpl(Envoy::Thread::ThreadFactory& thread_factory,
+                                   Envoy::ThreadLocal::Instance& tls,
+                                   Envoy::Event::DispatcherPtr&& dispatcher,
+                                   Envoy::Stats::StorePtr&& store, const Options& options,
+                                   int worker_number, uint64_t start_delay_usec,
+                                   std::unique_ptr<BenchmarkClient>&& benchmark_client)
+    : WorkerImpl(thread_factory, tls, std::move(dispatcher), std::move(store)),
+      worker_number_(worker_number), start_delay_usec_(start_delay_usec), options_(options),
+      benchmark_client_(std::move(benchmark_client)) {}
+
+void WorkerClientImpl::work() {
   PlatformUtilImpl platform_util;
   benchmark_client_->initialize(*runtime_);
 
@@ -87,23 +100,9 @@ void WorkerImpl::work() {
   dispatcher_->exit();
 }
 
-void WorkerImpl::waitForCompletion() {
-  ASSERT(started_ && !completed_);
-  completed_ = true;
-  thread_->join();
-}
+const Sequencer& WorkerClientImpl::sequencer() const { return *sequencer_; }
 
-const Sequencer& WorkerImpl::sequencer() const {
-  // TODO(oschaaf): reconsider.
-  ASSERT(started_ && completed_);
-  return *sequencer_;
-}
-
-const BenchmarkClient& WorkerImpl::benchmark_client() const {
-  // TODO(oschaaf): reconsider.
-  ASSERT(started_ && completed_);
-  return *benchmark_client_;
-}
+const BenchmarkClient& WorkerClientImpl::benchmark_client() const { return *benchmark_client_; }
 
 } // namespace Client
 } // namespace Nighthawk
