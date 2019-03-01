@@ -39,8 +39,6 @@ private:
   bool completed_;
 };
 
-typedef std::unique_ptr<WorkerClientImpl> WorkerClientImplPtr;
-
 class WorkerClientImpl : public WorkerImpl, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   WorkerClientImpl(Envoy::Thread::ThreadFactory& thread_factory, Envoy::ThreadLocal::Instance& tls,
@@ -61,6 +59,8 @@ private:
   const Options& options_;
   std::unique_ptr<BenchmarkClient> benchmark_client_;
 };
+
+typedef std::unique_ptr<WorkerClientImpl> WorkerClientImplPtr;
 
 } // namespace Client
 } // namespace Nighthawk
