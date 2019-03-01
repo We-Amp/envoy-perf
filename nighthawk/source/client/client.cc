@@ -52,7 +52,6 @@ void Main::configureComponentLogLevels(spdlog::level::level_enum level) {
 }
 
 bool Main::run() {
-  // TODO(oschaaf): platform specificity need addressing.
   auto thread_factory = Envoy::Thread::ThreadFactoryImplPosix();
   Envoy::Thread::MutexBasicLockable log_lock;
   auto logging_context = std::make_unique<Envoy::Logger::Context>(
@@ -105,13 +104,14 @@ bool Main::run() {
     Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
 
     auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
-        api, store, *dispatcher, *time_system_, options_->uri(),
-        std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
+        api, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher, *time_system_,
+        options_->uri(), std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
     benchmark_client->set_connection_timeout(options_->timeout());
     benchmark_client->set_connection_limit(options_->connections());
 
     workers.push_back(std::make_unique<WorkerImpl>(
-        tls, std::move(dispatcher), thread_factory, *options_, worker_number,
+        tls, std::move(dispatcher), thread_factory,
+        std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *options_, worker_number,
         inter_worker_delay_usec * worker_number, std::move(benchmark_client)));
   }
 

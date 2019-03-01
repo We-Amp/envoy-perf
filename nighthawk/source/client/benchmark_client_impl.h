@@ -31,7 +31,7 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
-  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::Store& store,
+  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::StorePtr&& store,
                       Envoy::Event::Dispatcher& dispatcher, Envoy::Event::TimeSystem& time_system,
                       const std::string& uri, Envoy::Http::HeaderMapImplPtr&& request_headers,
                       bool use_h2);
@@ -39,8 +39,6 @@ public:
 
   uint64_t pool_overflow_failures() { return pool_overflow_failures_; }
   uint64_t stream_reset_count() { return stream_reset_count_; }
-  uint64_t http_good_response_count() { return http_good_response_count_; }
-  uint64_t http_bad_response_count() { return http_bad_response_count_; }
 
   void set_connection_limit(uint64_t connection_limit) { connection_limit_ = connection_limit; }
   void set_connection_timeout(std::chrono::seconds timeout) { timeout_ = timeout; }
@@ -72,6 +70,14 @@ public:
 
   bool tryStartOne(std::function<void()> caller_completion_callback) override;
 
+  uint64_t getCounter(const std::string& counter) const override {
+    return store_->counter(counter).value();
+  }
+
+  std::string countersToString(CounterFilter filter = [](std::string, uint64_t) {
+    return true;
+  }) const override;
+
   // StreamDecoderCompletionCallback
   void onComplete(bool success, const Envoy::Http::HeaderMap& headers) override;
   void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) override;
@@ -81,7 +87,7 @@ private:
   void resetPool() { pool_.reset(); }
 
   Envoy::Event::Dispatcher& dispatcher_;
-  Envoy::Stats::Store& store_;
+  std::unique_ptr<Envoy::Stats::Store> store_;
   Envoy::Event::TimeSystem& time_system_;
   const Envoy::Http::HeaderMapImplPtr request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
@@ -101,14 +107,12 @@ private:
   Envoy::Event::TimerPtr timer_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
   uint64_t stream_reset_count_;
-  uint64_t http_good_response_count_;
-  uint64_t http_bad_response_count_;
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool allow_pending_for_test_;
   bool measure_latencies_;
-  Ssl::MinimalTransportSocketFactoryContext factory_context_;
-};
+  Ssl::MinimalTransportSocketFactoryContext transport_socket_factory_context_;
+}; // namespace Client
 
 } // namespace Client
 } // namespace Nighthawk

@@ -33,9 +33,15 @@ static_resources:
                 - "*"
                 routes:
                 - match:
-                    prefix: /
+                    prefix: /lorem-ipsum-status-200
                   direct_response:
                     status: 200
+                    body:
+                      filename: {{ test_tmpdir }}/lorem_ipsum.txt
+                - match:
+                    prefix: /404
+                  direct_response:
+                    status: 404
                     body:
                       filename: {{ test_tmpdir }}/lorem_ipsum.txt
             http_filters:

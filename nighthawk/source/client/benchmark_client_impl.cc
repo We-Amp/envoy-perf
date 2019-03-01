@@ -27,21 +27,20 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::Store& store,
+BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Stats::StorePtr&& store,
                                          Envoy::Event::Dispatcher& dispatcher,
                                          Envoy::Event::TimeSystem& time_system,
                                          const std::string& uri,
                                          Envoy::Http::HeaderMapImplPtr&& request_headers,
                                          bool use_h2)
-    : dispatcher_(dispatcher), store_(store), time_system_(time_system),
+    : dispatcher_(dispatcher), store_(std::move(store)), time_system_(time_system),
       request_headers_(std::move(request_headers)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
-      stream_reset_count_(0), http_good_response_count_(0), http_bad_response_count_(0),
-      requests_completed_(0), requests_initiated_(0), allow_pending_for_test_(false),
-      measure_latencies_(false),
-      factory_context_(time_system_, store_.createScope("nighthawk.transport"), dispatcher_,
-                       generator_, store_, api) {
+      stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
+      allow_pending_for_test_(false), measure_latencies_(false),
+      transport_socket_factory_context_(time_system_, store_->createScope("transport."),
+                                        dispatcher_, generator_, *store_, api) {
   ASSERT(uri_->isValid());
   request_headers_->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_->insertPath().value(uri_->path());
@@ -89,21 +88,20 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::Loader& runtime) {
 
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
-  if (use_h2_) {
-    auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
-    common_tls_context->add_alpn_protocols("h2");
-  }
-  // TODO(oschaaf): h2c
   if (uri_->scheme() == "https") {
-    socket_factory =
-        Envoy::Upstream::createTransportSocketFactory(cluster_config, factory_context_);
+    if (use_h2_) {
+      auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
+      common_tls_context->add_alpn_protocols("h2");
+    }
+    socket_factory = Envoy::Upstream::createTransportSocketFactory(
+        cluster_config, transport_socket_factory_context_);
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };
 
   cluster_ = std::make_unique<Envoy::Upstream::ClusterInfoImpl>(
       cluster_config, bind_config, runtime, std::move(socket_factory),
-      store_.createScope("nighthawk."), false /*added_via_api*/);
+      store_->createScope("client."), false /*added_via_api*/);
 
   Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
       std::make_shared<Envoy::Network::ConnectionSocket::Options>();
@@ -148,6 +146,18 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
   return true;
 }
 
+std::string BenchmarkHttpClient::countersToString(CounterFilter filter) const {
+  auto counters = store_->counters();
+  std::string s;
+
+  for (auto stat : counters) {
+    if (filter(stat->name(), stat->value())) {
+      s += fmt::format("{}:{}\n", stat->name(), stat->value());
+    }
+  }
+  return s;
+}
+
 void BenchmarkHttpClient::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {
   requests_completed_++;
   if (!success) {
@@ -155,11 +165,10 @@ void BenchmarkHttpClient::onComplete(bool success, const Envoy::Http::HeaderMap&
   } else {
     ASSERT(headers.Status());
     const int64_t status = Envoy::Http::Utility::getResponseStatus(headers);
-    // TODO(oschaaf): we can very probably pull these from the stats.
     if (status >= 400 && status <= 599) {
-      http_bad_response_count_++;
-    } else {
-      http_good_response_count_++;
+      // TODO(oschaaf): Figure out why this isn't incremented for us.
+      // TODO(oschaaf): don't get this stat each time, cache it?
+      store_->counter("client.upstream_cx_protocol_error").inc();
     }
   }
 }

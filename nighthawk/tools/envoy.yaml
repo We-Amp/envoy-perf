@@ -24,7 +24,7 @@ static_resources:
                 direct_response:
                   status: 200
                   body:
-                    filename: test/lorem_ipsum.txt
+                    filename: test/test_data/lorem_ipsum.txt
           http_filters:
           - name: envoy.router
             config:

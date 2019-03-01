@@ -1,7 +1,6 @@
 #include "nighthawk/source/client/worker_impl.h"
 
 #include "common/api/api_impl.h"
-#include "common/stats/isolated_store_impl.h"
 
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/platform_util_impl.h"
@@ -15,14 +14,15 @@ namespace Client {
 
 // TODO(oschaaf): Fix argument ordering here.
 WorkerImpl::WorkerImpl(Envoy::ThreadLocal::Instance& tls, Envoy::Event::DispatcherPtr&& dispatcher,
-                       Envoy::Thread::ThreadFactory& thread_factory, const Options& options,
-                       int worker_number, uint64_t start_delay_usec,
+                       Envoy::Thread::ThreadFactory& thread_factory, Envoy::Stats::StorePtr&& store,
+                       const Options& options, int worker_number, uint64_t start_delay_usec,
                        std::unique_ptr<BenchmarkClient>&& benchmark_client)
     : tls_(tls), dispatcher_(std::move(dispatcher)), thread_factory_(thread_factory),
-      worker_number_(worker_number), start_delay_usec_(start_delay_usec), options_(options),
-      started_(false), completed_(false), benchmark_client_(std::move(benchmark_client)) {
+      store_(std::move(store)), worker_number_(worker_number), start_delay_usec_(start_delay_usec),
+      options_(options), started_(false), completed_(false),
+      benchmark_client_(std::move(benchmark_client)) {
   tls_.registerThread(*dispatcher_, false);
-  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, store_, tls_);
+  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, *store_, tls_);
 }
 
 WorkerImpl::~WorkerImpl() { tls_.shutdownThread(); }
@@ -71,22 +71,14 @@ void WorkerImpl::work() {
       "percentiles:\n{}",
       connection_statistic.toString(), response_statistic.toString());
 
-  /*
-    ENVOY_LOG(info,
-              "> worker {}: {:.{}f}/second. Mean: {:.{}f}μs. pstdev: "
-              "{:.{}f}μs. "
-              "Connections good/bad/overflow: {}/{}/{}. Replies: good/fail:{}/{}. Stream "
-              "resets: {}.\n {}",
-              worker_number_, sequencer_->completionsPerSecond(), 2,
-              sequencer_->latencyStatistic().mean() / 1000, 2,
-              sequencer_->latencyStatistic().pstdev() / 1000, 2,
-              store_.counter("nighthawk.upstream_cx_total").value(),
-              store_.counter("nighthawk.upstream_cx_connect_fail").value(),
-              benchmark_client_->pool_overflow_failures(),
-              benchmark_client_->http_good_response_count(),
-              benchmark_client_->http_bad_response_count(), benchmark_client_->stream_reset_count(),
-              worker_percentiles);
-  */
+  CounterFilter filter = [](std::string, uint64_t value) { return value > 0; };
+  ENVOY_LOG(info,
+            "> worker {}: {:.{}f}/second. Mean: {:.{}f} μs. pstdev: {:.{}f} μs.\n{}\n"
+            ".\n {}",
+            worker_number_, sequencer_->completionsPerSecond(), 2,
+            sequencer_->latencyStatistic().mean() / 1000, 2,
+            sequencer_->latencyStatistic().pstdev() / 1000, 2,
+            benchmark_client_->countersToString(filter), worker_percentiles);
 
   // TOOD(oschaaf): Some of the benchmark_client members we call are specific to the
   // HttpBenchmarkClient. Generalize that in the interface, and re-enable after adjusting for that.

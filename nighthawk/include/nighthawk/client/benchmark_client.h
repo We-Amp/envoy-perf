@@ -1,11 +1,15 @@
 #pragma once
 
+#include <functional>
+
 #include "envoy/runtime/runtime.h"
 
 #include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Client {
+
+typedef std::function<bool(const std::string, const uint64_t)> CounterFilter;
 
 class BenchmarkClient {
 public:
@@ -50,6 +54,22 @@ public:
    * @return false if the request could not be started, for example due to resource limits.
    */
   virtual bool tryStartOne(std::function<void()> caller_completion_callback) PURE;
+
+  /**
+   * Gets the value of a counter by name.
+   * @param counter The name of the counter
+   * @return uint64_t The value of the counter.
+   */
+  virtual uint64_t getCounter(const std::string& counter) const PURE;
+
+  /**
+   * Transforms statistics matching the filter argument into a string of statistic "name:value"
+   * pairs, one per line.
+   * @param filter function that returns true iff a statistic should be transformed, based on the
+   * named and value it gets passed.
+   * @return std::string containing zero or more lines containing "name:value\n".
+   */
+  virtual std::string countersToString(CounterFilter filter) const PURE;
 
 protected:
   /**

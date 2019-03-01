@@ -83,22 +83,21 @@ public:
     fake_upstreams_.clear();
   }
 
-  void testBasicFunctionality(bool allow_pending, uint64_t max_pending, uint64_t connection_limit,
-                              bool use_https, bool use_h2, uint64_t amount_of_request,
-                              uint64_t expected_good_responses,
-                              uint64_t expected_connect_failures) {
+  void testBasicFunctionality(std::string uriPath, bool allow_pending, uint64_t max_pending,
+                              uint64_t connection_limit, bool use_https, bool use_h2,
+                              uint64_t amount_of_request) {
     Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
     request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
-    Client::BenchmarkHttpClient client(
-        api_, store_, *dispatcher_, time_system_,
-        fmt::format("{}://{}/", use_https ? "https" : "http", getTestServerHostAndPort()),
+    client_ = std::make_unique<Client::BenchmarkHttpClient>(
+        api_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher_, time_system_,
+        fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
         std::move(request_headers), use_h2);
 
-    client.set_connection_timeout(10s);
-    client.set_allow_pending_for_test(allow_pending);
-    client.set_max_pending_requests(max_pending);
-    client.set_connection_limit(connection_limit);
-    client.initialize(runtime_);
+    client_->set_connection_timeout(10s);
+    client_->set_allow_pending_for_test(allow_pending);
+    client_->set_max_pending_requests(max_pending);
+    client_->set_connection_limit(connection_limit);
+    client_->initialize(runtime_);
 
     uint64_t amount = amount_of_request;
     uint64_t inflight_response_count = 0;
@@ -111,7 +110,7 @@ public:
     };
 
     for (uint64_t i = 0; i < amount; i++) {
-      if (client.tryStartOne(f)) {
+      if (client_->tryStartOne(f)) {
         inflight_response_count++;
       }
     }
@@ -120,26 +119,25 @@ public:
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
-    EXPECT_EQ(expected_connect_failures, inflight_response_count);
-    EXPECT_EQ(expected_connect_failures,
-              store_.counter("nighthawk.upstream_cx_connect_fail").value());
-    EXPECT_EQ(0, store_.counter("nighthawk.cx_connect_attempts_exceeded").value());
-    EXPECT_EQ(0, store_.counter("nighthawk.upstream_cx_overflow").value());
-    EXPECT_EQ(0, client.http_bad_response_count());
-    EXPECT_EQ(0, client.stream_reset_count());
+    EXPECT_EQ(0, client_->stream_reset_count());
     // We throttle before the pool, so we expect no pool overflows.
-    EXPECT_EQ(0, client.pool_overflow_failures());
-    EXPECT_EQ(expected_good_responses, client.http_good_response_count());
+    EXPECT_EQ(0, client_->pool_overflow_failures());
+  }
+
+  std::string getChangedCounters() {
+    Client::CounterFilter filter = [](std::string, uint64_t value) { return value > 0; };
+    return client_->countersToString(filter);
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
-  Envoy::Stats::IsolatedStoreImpl store_;
   Envoy::Event::TimeSystem& time_system_;
+  Envoy::Stats::IsolatedStoreImpl store_;
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
   Envoy::ThreadLocal::InstanceImpl tls_;
   ::testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
+  std::unique_ptr<Client::BenchmarkHttpClient> client_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
@@ -151,35 +149,83 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
 // based on the args we pass to testBasicfunctionality(). Fix this by adding comments.
 
 TEST_P(BenchmarkClientTest, BasicTestH1) {
-  testBasicFunctionality(false, 1, 1, false, false, 10, 1, 0);
+  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, false, 10);
+  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
+client.upstream_rq_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_rx_bytes_total:3625\n\
+client.upstream_cx_tx_bytes_total:82\n",
+            getChangedCounters());
+}
+
+TEST_P(BenchmarkClientTest, BasicTestH1404) {
+  testBasicFunctionality("/lorem-ipsum-status-404", false, 1, 1, false, false, 10);
+  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
+client.upstream_rq_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_cx_protocol_error:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_rx_bytes_total:97\n\
+client.upstream_cx_tx_bytes_total:82\n",
+            getChangedCounters());
 }
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
-  testBasicFunctionality(false, 1, 1, true, false, 10, 1, 0);
+  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, true, false, 10);
+  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
+client.upstream_rq_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_rx_bytes_total:3625\n\
+client.upstream_cx_tx_bytes_total:82\n",
+            getChangedCounters());
 }
 
 // The following two are disabled because of trouble with runtime initialization, causing them
 // to crash out.
 TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) {
-  testBasicFunctionality(false, 1, 1, true, true, 10, 1, 0);
+  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, true, true, 10);
+  EXPECT_EQ("todo", getChangedCounters());
 }
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2C) {
-  testBasicFunctionality(false, 1, 1, false, true, 10, 1, 0);
+TEST_P(BenchmarkClientTest, BasicTestH2C) {
+  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, true, 10);
+  EXPECT_EQ("client.upstream_rq_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_rx_bytes_total:3585\n\
+client.upstream_cx_http2_total:1\n\
+client.upstream_cx_tx_bytes_total:109\n",
+            getChangedCounters());
 }
 
 TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
   // Kill the test server, so we can't connect.
   // We allow a single connection and no pending. We expect one connection failure.
   test_server_.reset();
-  testBasicFunctionality(false, 1, 1, false, false, 10, 0, 1);
+  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, false, 10);
+  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
+client.upstream_rq_pending_failure_eject:1\n\
+client.upstream_rq_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_connect_fail:1\n",
+            getChangedCounters());
 }
 
 TEST_P(BenchmarkClientTest, H1MultiConnectionFailure) {
   // Kill the test server, so we can't connect.
   // We allow a ten connections and ten pending requests. We expect ten connection failures.
   test_server_.reset();
-  testBasicFunctionality(true, 10, 10, false, false, 10, 0, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", true, 10, 10, false, false, 10);
+  EXPECT_EQ("client.upstream_cx_http1_total:10\n\
+client.upstream_rq_pending_failure_eject:10\n\
+client.upstream_rq_total:10\n\
+client.upstream_rq_pending_total:10\n\
+client.upstream_cx_total:10\n\
+client.upstream_cx_connect_fail:10\n",
+            getChangedCounters());
 }
 
 } // namespace Nighthawk
