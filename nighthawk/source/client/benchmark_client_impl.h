@@ -47,17 +47,18 @@ public:
 
   // BenchmarkClient
   void initialize(Envoy::Runtime::Loader& runtime) override;
+
   void terminate() override { resetPool(); };
 
-  const std::vector<std::tuple<std::string, const Statistic&>> statistics() const override {
-    std::vector<std::tuple<std::string, const Statistic&>> statistics;
-    statistics.push_back(
-        std::tuple<std::string, const Statistic&>{"Pool and connection setup", connect_statistic_});
-    statistics.push_back(
-        std::tuple<std::string, const Statistic&>{"Request to response", response_statistic_});
+  const std::vector<NamedStatistic> statistics() const override {
+    std::vector<NamedStatistic> statistics;
+    statistics.push_back(NamedStatistic{"Pool and connection setup", connect_statistic_});
+    statistics.push_back(NamedStatistic{"Request to response", response_statistic_});
     return statistics;
   };
+
   bool measureLatencies() const override { return measure_latencies_; }
+
   void setMeasureLatencies(bool measure_latencies) override {
     measure_latencies_ = measure_latencies;
   }

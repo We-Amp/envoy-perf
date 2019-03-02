@@ -122,17 +122,15 @@ bool Main::run() {
   std::unique_ptr<Statistic> connection_statistic = std::make_unique<HdrStatistic>();
   std::unique_ptr<Statistic> response_statistic = std::make_unique<HdrStatistic>();
 
-  /*
-    for (auto& w : workers) {
-      sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
-      blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
-      auto benchmark_client_statistics = w->benchmark_client().statistics();
-      connection_statistic =
-          connection_statistic->combine(std::get<1>(benchmark_client_statistics.front()));
-      response_statistic =
-          response_statistic->combine(std::get<1>(benchmark_client_statistics.back()));
-    }
-  */
+  // TODO(oschaaf): We don't grab the right ones here matching the names. Generalize
+  // this loop and output/protoc generation.
+  for (auto& w : workers) {
+    sequencer_statistic = sequencer_statistic->combine(std::get<1>(w->statistics()[0]));
+    blocked_statistic = blocked_statistic->combine(std::get<1>(w->statistics()[1]));
+    connection_statistic = connection_statistic->combine(std::get<1>(w->statistics()[2]));
+    response_statistic = response_statistic->combine(std::get<1>(w->statistics()[3]));
+  }
+
   tls.shutdownGlobalThreading();
 
   if (blocked_statistic->count() > 0) {

@@ -3,6 +3,7 @@
 #include "common/stats/isolated_store_impl.h"
 
 #include "nighthawk/source/client/benchmark_client_impl.h"
+#include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
@@ -26,6 +27,11 @@ std::unique_ptr<Envoy::Stats::Store> OptionInterpreterImpl::createStatsStore() {
 
 std::unique_ptr<Statistic> OptionInterpreterImpl::createStatistic() {
   return std::make_unique<HdrStatistic>();
+}
+
+std::unique_ptr<PlatformUtil> OptionInterpreterImpl::getPlatformUtil() {
+  // TODO(oschaaf): singleton?
+  return std::make_unique<PlatformUtilImpl>();
 }
 
 } // namespace Client

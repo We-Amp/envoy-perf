@@ -6,8 +6,8 @@
 
 #include "nighthawk/client/benchmark_client.h"
 
+#include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/common/frequency.h"
-#include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
 
@@ -48,7 +48,7 @@ WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy:
 }
 
 void WorkerClientImpl::work() {
-  PlatformUtilImpl platform_util;
+  OptionInterpreterImpl option_interpreter(options_);
   benchmark_client_->initialize(*runtime_);
 
   ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
@@ -72,8 +72,13 @@ void WorkerClientImpl::work() {
   LinearRateLimiter rate_limiter(time_source_, Frequency(options_.requests_per_second()));
   SequencerTarget f =
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
-  sequencer_.reset(new SequencerImpl(platform_util, *dispatcher_, time_source_, rate_limiter, f,
-                                     options_.duration(), options_.timeout()));
+
+  // TODO(oschaaf): lifetime of the latform util.
+  auto platform_util = option_interpreter.getPlatformUtil();
+  sequencer_.reset(new SequencerImpl(*platform_util, *dispatcher_, time_source_, rate_limiter, f,
+                                     option_interpreter.createStatistic(),
+                                     option_interpreter.createStatistic(), options_.duration(),
+                                     options_.timeout()));
 
   sequencer_->start();
   sequencer_->waitForCompletion();
@@ -92,12 +97,26 @@ void WorkerClientImpl::work() {
             "> worker {}: {:.{}f}/second. Mean: {:.{}f} μs. pstdev: {:.{}f} μs.\n{}\n"
             ".\n {}",
             worker_number_, sequencer_->completionsPerSecond(), 2,
-            sequencer_->latencyStatistic().mean() / 1000, 2,
-            sequencer_->latencyStatistic().pstdev() / 1000, 2,
+            std::get<1>(sequencer_->statistics().front()).mean() / 1000, 2,
+            std::get<1>(sequencer_->statistics().back()).pstdev() / 1000, 2,
             benchmark_client_->countersToString(filter), worker_percentiles);
 
   benchmark_client_->terminate();
   dispatcher_->exit();
+}
+
+const std::vector<NamedStatistic> WorkerClientImpl::statistics() const {
+  std::vector<NamedStatistic> statistics;
+
+  // TODO(oschaaf): std::insert.
+  for (auto tuple : benchmark_client_->statistics()) {
+    statistics.push_back(tuple);
+  }
+  for (auto tuple : sequencer_->statistics()) {
+    statistics.push_back(tuple);
+  }
+
+  return statistics;
 }
 
 } // namespace Client

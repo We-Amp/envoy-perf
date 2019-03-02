@@ -4,8 +4,6 @@
 
 #include "envoy/common/pure.h"
 
-#include "nighthawk/common/sequencer.h"
-
 namespace Nighthawk {
 namespace Client {
 
@@ -25,6 +23,13 @@ public:
    * Stop the worker thread.
    */
   virtual void waitForCompletion() PURE;
+
+  /**
+   * gets the statistics.
+   *
+   * @return const std::vector<NamedStatistic> A vector of Statistics and their respective names.
+   */
+  virtual const std::vector<NamedStatistic> statistics() const PURE;
 
 protected:
   /**

@@ -39,6 +39,7 @@ class SequencerImpl : public Sequencer, public Envoy::Logger::Loggable<Envoy::Lo
 public:
   SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
                 Envoy::TimeSource& time_source, RateLimiter& rate_limiter, SequencerTarget& target,
+                StatisticPtr&& latency_statistic, StatisticPtr&& blocked_statistic,
                 std::chrono::microseconds duration, std::chrono::microseconds grace_timeout);
 
   /**
@@ -61,8 +62,11 @@ public:
     return usec == 0 ? 0 : ((targets_completed_ / usec) * 1000000);
   }
 
-  const Statistic& blockedStatistic() const override { return *blocked_statistic_; }
-  const Statistic& latencyStatistic() const override { return *latency_statistic_; }
+  virtual const std::vector<NamedStatistic> statistics() const override;
+
+  // TODO(oschaaf): These are only used in tests, sanitize.
+  const Statistic& blockedStatistic() const { return *blocked_statistic_; }
+  const Statistic& latencyStatistic() const { return *latency_statistic_; }
 
 protected:
   /**
@@ -96,11 +100,11 @@ private:
   PlatformUtil& platform_util_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
-  std::unique_ptr<Statistic> blocked_statistic_;
+  RateLimiter& rate_limiter_;
   std::unique_ptr<Statistic> latency_statistic_;
+  std::unique_ptr<Statistic> blocked_statistic_;
   Envoy::Event::TimerPtr periodic_timer_;
   Envoy::Event::TimerPtr spin_timer_;
-  RateLimiter& rate_limiter_;
   std::chrono::microseconds duration_;
   std::chrono::microseconds grace_timeout_;
   Envoy::MonotonicTime start_;

@@ -11,10 +11,13 @@ namespace Nighthawk {
 
 SequencerImpl::SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
                              Envoy::TimeSource& time_source, RateLimiter& rate_limiter,
-                             SequencerTarget& target, std::chrono::microseconds duration,
+                             SequencerTarget& target, StatisticPtr&& latency_statistic,
+                             StatisticPtr&& blocked_statistic, std::chrono::microseconds duration,
                              std::chrono::microseconds grace_timeout)
     : target_(target), platform_util_(platform_util), dispatcher_(dispatcher),
-      time_source_(time_source), rate_limiter_(rate_limiter), duration_(duration),
+      time_source_(time_source), rate_limiter_(rate_limiter),
+      latency_statistic_(std::move(latency_statistic)),
+      blocked_statistic_(std::move(blocked_statistic)), duration_(duration),
       grace_timeout_(grace_timeout), start_(time_source.monotonicTime().min()),
       targets_initiated_(0), targets_completed_(0), running_(false), blocked_(false) {
   ASSERT(target_ != nullptr, "No SequencerTarget");
@@ -145,5 +148,12 @@ void SequencerImpl::waitForCompletion() {
   // We should guarantee the flow terminates, so:
   ASSERT(!running_);
 }
+
+const std::vector<NamedStatistic> SequencerImpl::statistics() const {
+  std::vector<NamedStatistic> statistics;
+  statistics.push_back(NamedStatistic{"Sequencer observed latency", *latency_statistic_});
+  statistics.push_back(NamedStatistic{"Sequencer observed blocking", *blocked_statistic_});
+  return statistics;
+};
 
 } // namespace Nighthawk

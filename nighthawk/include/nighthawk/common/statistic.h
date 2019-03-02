@@ -68,4 +68,7 @@ public:
   virtual std::unique_ptr<Statistic> combine(const Statistic& statistic) PURE;
 };
 
+typedef std::unique_ptr<Statistic> StatisticPtr;
+typedef std::tuple<std::string, const Statistic&> NamedStatistic;
+
 } // namespace Nighthawk

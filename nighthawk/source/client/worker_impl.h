@@ -13,6 +13,7 @@
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"
 #include "nighthawk/common/sequencer.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -45,6 +46,8 @@ public:
   WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
                    Envoy::ThreadLocal::Instance& tls, const Options& options, int worker_number,
                    uint64_t start_delay_usec);
+
+  const std::vector<NamedStatistic> statistics() const override;
 
 private:
   void work() override;

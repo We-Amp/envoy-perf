@@ -19,6 +19,7 @@
 
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 using namespace std::chrono_literals;
 
@@ -34,7 +35,7 @@ public:
         test_number_of_intervals_(5), sequencer_target_(std::bind(&SequencerTestBase::callback_test,
                                                                   this, std::placeholders::_1)),
         clock_updates_(0) {
-    platform_util_.setTimeSystem(this->time_source_);
+    platform_util_.setTimeSystem(time_source_);
   }
 
   virtual ~SequencerTestBase() = default;
@@ -77,7 +78,8 @@ TEST_F(SequencerTest, EmptyCallbackAsserts) {
   SequencerTarget callback_empty;
 
   ASSERT_DEATH(SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
-                                       callback_empty, 1s, 1s),
+                                       callback_empty, std::make_unique<StreamingStatistic>(),
+                                       std::make_unique<StreamingStatistic>(), 1s, 1s),
                "No SequencerTarget");
 }
 
@@ -87,7 +89,8 @@ TEST_F(SequencerTest, SingleShotStartingTwiceAsserts) {
   EXPECT_CALL(*dispatcher_, createTimer_(_)).Times(2);
 
   SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
-                          sequencer_target_, 1s, 1s);
+                          sequencer_target_, std::make_unique<StreamingStatistic>(),
+                          std::make_unique<StreamingStatistic>(), 1s, 1s);
   sequencer.start();
   ASSERT_DEATH(sequencer.start(), "");
 }
@@ -98,7 +101,8 @@ TEST_F(SequencerTest, WaitWithoutStartAsserts) {
   EXPECT_CALL(*dispatcher_, createTimer_(_)).Times(2);
 
   SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
-                          sequencer_target_, 1s, 1s);
+                          sequencer_target_, std::make_unique<StreamingStatistic>(),
+                          std::make_unique<StreamingStatistic>(), 1s, 1s);
   ASSERT_DEATH(sequencer.waitForCompletion(), "");
 }
 
@@ -174,9 +178,10 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterInteraction) {
 
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
-                          test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
-                          1ms /* Sequencer timeout. */);
+  SequencerImpl sequencer(
+      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
+      test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 1ms /* Sequencer timeout. */);
   // Have the mock rate limiter gate two calls, and block everything else.
   EXPECT_CALL(getRateLimiter(), tryAcquireOne())
       .Times(testing::AtLeast(3))
@@ -199,9 +204,10 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterSaturatedTargetInteraction) {
 
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
-                          test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
-                          0ms /* Sequencer timeout. */);
+  SequencerImpl sequencer(
+      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
+      test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 0ms /* Sequencer timeout. */);
 
   EXPECT_CALL(getRateLimiter(), tryAcquireOne())
       .Times(testing::AtLeast(3))
@@ -238,7 +244,9 @@ public:
 
 TEST_F(SequencerIntegrationTest, TheHappyFlow) {
   SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_,
-                          sequencer_target_, test_number_of_intervals_ * interval_, 1s);
+                          sequencer_target_, std::make_unique<StreamingStatistic>(),
+                          std::make_unique<StreamingStatistic>(),
+                          test_number_of_intervals_ * interval_, 1s);
 
   EXPECT_CALL(platform_util_, yieldCurrentThread()).Times(testing::AtLeast(1));
 
@@ -258,9 +266,10 @@ TEST_F(SequencerIntegrationTest, TheHappyFlow) {
 TEST_F(SequencerIntegrationTest, AlwaysSaturatedTargetTest) {
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::saturated_test, this, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
-                          test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
-                          1ms /* Sequencer timeout. */);
+  SequencerImpl sequencer(
+      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
+      test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 1ms /* Sequencer timeout. */);
 
   sequencer.start();
   sequencer.waitForCompletion();
@@ -278,9 +287,10 @@ TEST_F(SequencerIntegrationTest, GraceTimeoutTest) {
 
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::timeout_test, this, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
-                          test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
-                          grace_timeout);
+  SequencerImpl sequencer(
+      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
+      test_number_of_intervals_ * interval_ /* Sequencer run time.*/, grace_timeout);
 
   auto pre_timeout = time_source_.monotonicTime();
   sequencer.start();

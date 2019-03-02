@@ -2,9 +2,6 @@
 
 #include "nighthawk/client/option_interpreter.h"
 
-#include "nighthawk/client/benchmark_client.h"
-#include "nighthawk/common/statistic.h"
-
 namespace Nighthawk {
 namespace Client {
 
@@ -16,6 +13,7 @@ public:
 
   std::unique_ptr<Envoy::Stats::Store> createStatsStore() override;
   std::unique_ptr<Statistic> createStatistic() override;
+  std::unique_ptr<PlatformUtil> getPlatformUtil() override;
 
 private:
   const Options& options_;
