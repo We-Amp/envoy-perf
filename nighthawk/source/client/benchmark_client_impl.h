@@ -2,17 +2,14 @@
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/address.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/api/api_impl.h"
 #include "common/common/logger.h"
 #include "common/http/header_map_impl.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
 #include "nighthawk/common/sequencer.h"
@@ -31,7 +28,7 @@ class BenchmarkHttpClient : public BenchmarkClient,
 public:
   // TODO(oschaaf): Pass in a request generator instead of just the request headers.
   BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                      Envoy::Event::TimeSystem& time_system, const std::string& uri, bool use_h2);
+                      const std::string& uri, bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
@@ -83,9 +80,9 @@ private:
   void syncResolveDns();
   void resetPool() { pool_.reset(); }
 
+  Envoy::Api::Api& api_;
   Envoy::Event::Dispatcher& dispatcher_;
   std::unique_ptr<Envoy::Stats::Store> store_;
-  Envoy::Event::TimeSystem& time_system_;
   Envoy::Http::HeaderMapImpl request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   HdrStatistic response_statistic_;

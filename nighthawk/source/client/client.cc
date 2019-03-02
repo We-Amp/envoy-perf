@@ -33,8 +33,7 @@ namespace Client {
 Main::Main(int argc, const char* const* argv)
     : Main(std::make_unique<Client::OptionsImpl>(argc, argv)) {}
 
-Main::Main(Client::OptionsPtr&& options)
-    : options_(std::move(options)), time_system_(std::make_unique<Envoy::Event::RealTimeSystem>()) {
+Main::Main(Client::OptionsPtr&& options) : options_(std::move(options)) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Envoy::Event::Libevent::Global::initialize();
   configureComponentLogLevels(spdlog::level::from_str(options_->verbosity()));
@@ -84,7 +83,8 @@ bool Main::run() {
   }
 
   Envoy::Stats::IsolatedStoreImpl store;
-  Envoy::Api::Impl api(thread_factory, store, *time_system_);
+  Envoy::Event::RealTimeSystem time_system;
+  Envoy::Api::Impl api(thread_factory, store, time_system);
   Envoy::ThreadLocal::InstanceImpl tls;
   Envoy::Event::DispatcherPtr main_dispatcher(api.allocateDispatcher());
   // TODO(oschaaf): later on, fire up and use a main dispatcher loop as need arises.

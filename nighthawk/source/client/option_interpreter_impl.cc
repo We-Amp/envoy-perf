@@ -10,10 +10,9 @@ OptionInterpreterImpl::OptionInterpreterImpl(const Options& options) : options_(
 
 std::unique_ptr<BenchmarkClient>
 OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
-                                             Envoy::Event::Dispatcher& dispatcher,
-                                             Envoy::Event::TimeSystem& time_system) {
-  auto benchmark_client = std::make_unique<BenchmarkHttpClient>(api, dispatcher, time_system,
-                                                                options_.uri(), options_.h2());
+                                             Envoy::Event::Dispatcher& dispatcher) {
+  auto benchmark_client =
+      std::make_unique<BenchmarkHttpClient>(api, dispatcher, options_.uri(), options_.h2());
   benchmark_client->set_connection_timeout(options_.timeout());
   benchmark_client->set_connection_limit(options_.connections());
   return benchmark_client;

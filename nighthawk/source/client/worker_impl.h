@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/event/timer.h"
+#include "envoy/common/time.h"
 #include "envoy/stats/store.h"
 
 #include "common/common/logger.h"
@@ -32,7 +32,7 @@ protected:
   std::unique_ptr<Envoy::Stats::Store> store_;
   std::unique_ptr<Envoy::Runtime::LoaderImpl> runtime_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
-  std::unique_ptr<Envoy::Event::TimeSystem> time_system_;
+  Envoy::TimeSource& time_source_;
 
 private:
   Envoy::Thread::ThreadPtr thread_;

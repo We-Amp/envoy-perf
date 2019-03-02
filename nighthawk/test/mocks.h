@@ -22,10 +22,10 @@ public:
   ~SimulatedTimeAwarePlatformUtil();
 
   void yieldCurrentThread() const override;
-  void setTimeSystem(Envoy::Event::SimulatedTimeSystem& time_system);
+  void setTimeSystem(Envoy::Event::SimulatedTimeSystem& time_source);
 
 private:
-  Envoy::Event::SimulatedTimeSystem* time_system_;
+  Envoy::Event::SimulatedTimeSystem* time_source_;
 };
 
 class MockPlatformUtil : public SimulatedTimeAwarePlatformUtil {

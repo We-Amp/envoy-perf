@@ -6,7 +6,6 @@
 
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/stats/store.h"
 
 #include "nighthawk/client/benchmark_client.h"
@@ -23,8 +22,7 @@ class OptionInterpreter {
 public:
   virtual ~OptionInterpreter() = default;
   virtual std::unique_ptr<BenchmarkClient>
-  createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                        Envoy::Event::TimeSystem& time_system) PURE;
+  createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) PURE;
 
   virtual std::unique_ptr<Envoy::Stats::Store> createStatsStore() PURE;
 };

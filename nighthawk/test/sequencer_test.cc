@@ -27,20 +27,20 @@ namespace Nighthawk {
 class SequencerTestBase : public testing::Test {
 public:
   SequencerTestBase()
-      : api_(Envoy::Thread::ThreadFactorySingleton::get(), store_, time_system_),
+      : api_(Envoy::Thread::ThreadFactorySingleton::get(), store_, time_source_),
         dispatcher_(std::make_unique<Envoy::Event::MockDispatcher>()), callback_test_count_(0),
         frequency_(10_Hz),
         interval_(std::chrono::duration_cast<std::chrono::milliseconds>(frequency_.interval())),
         test_number_of_intervals_(5), sequencer_target_(std::bind(&SequencerTestBase::callback_test,
                                                                   this, std::placeholders::_1)),
         clock_updates_(0) {
-    platform_util_.setTimeSystem(this->time_system_);
+    platform_util_.setTimeSystem(this->time_source_);
   }
 
   virtual ~SequencerTestBase() = default;
 
   void moveClockForwardOneInterval() {
-    time_system_.setMonotonicTime(time_system_.monotonicTime() + interval_);
+    time_source_.setMonotonicTime(time_source_.monotonicTime() + interval_);
     clock_updates_++;
   }
 
@@ -52,7 +52,7 @@ public:
 
   MockPlatformUtil platform_util_;
   Envoy::Stats::IsolatedStoreImpl store_;
-  Envoy::Event::SimulatedTimeSystem time_system_;
+  Envoy::Event::SimulatedTimeSystem time_source_;
   Envoy::Api::Impl api_;
   std::unique_ptr<Envoy::Event::MockDispatcher> dispatcher_;
   int callback_test_count_;
@@ -76,7 +76,7 @@ public:
 TEST_F(SequencerTest, EmptyCallbackAsserts) {
   SequencerTarget callback_empty;
 
-  ASSERT_DEATH(SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, getRateLimiter(),
+  ASSERT_DEATH(SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
                                        callback_empty, 1s, 1s),
                "No SequencerTarget");
 }
@@ -86,7 +86,7 @@ TEST_F(SequencerTest, SingleShotStartingTwiceAsserts) {
   EXPECT_CALL(getRateLimiter(), tryAcquireOne());
   EXPECT_CALL(*dispatcher_, createTimer_(_)).Times(2);
 
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, getRateLimiter(),
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
                           sequencer_target_, 1s, 1s);
   sequencer.start();
   ASSERT_DEATH(sequencer.start(), "");
@@ -97,7 +97,7 @@ TEST_F(SequencerTest, WaitWithoutStartAsserts) {
   EXPECT_CALL(getRateLimiter(), tryAcquireOne()).Times(0);
   EXPECT_CALL(*dispatcher_, createTimer_(_)).Times(2);
 
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, getRateLimiter(),
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, getRateLimiter(),
                           sequencer_target_, 1s, 1s);
   ASSERT_DEATH(sequencer.waitForCompletion(), "");
 }
@@ -141,7 +141,7 @@ public:
   // Moves time forward 1ms, and runs the ballbacks of set timers.
   void simulateTimerLoop() {
     while (!stopped_) {
-      time_system_.setMonotonicTime(time_system_.monotonicTime() + EnvoyTimerMinResolution);
+      time_source_.setMonotonicTime(time_source_.monotonicTime() + EnvoyTimerMinResolution);
 
       // TODO(oschaaf): This can be implemented more accurately, by keeping track of timer
       // enablement preserving ordering of which timer should fire first. For now this seems to
@@ -174,7 +174,7 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterInteraction) {
 
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, *rate_limiter_, callback,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
                           test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
                           1ms /* Sequencer timeout. */);
   // Have the mock rate limiter gate two calls, and block everything else.
@@ -199,7 +199,7 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterSaturatedTargetInteraction) {
 
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, *rate_limiter_, callback,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
                           test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
                           0ms /* Sequencer timeout. */);
 
@@ -225,7 +225,7 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterSaturatedTargetInteraction) {
 class SequencerIntegrationTest : public SequencerTestWithTimerEmulation {
 public:
   SequencerIntegrationTest() {
-    rate_limiter_ = std::make_unique<LinearRateLimiter>(time_system_, frequency_);
+    rate_limiter_ = std::make_unique<LinearRateLimiter>(time_source_, frequency_);
   }
 
   bool timeout_test(std::function<void()> /* f */) {
@@ -237,7 +237,7 @@ public:
 };
 
 TEST_F(SequencerIntegrationTest, TheHappyFlow) {
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, *rate_limiter_,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_,
                           sequencer_target_, test_number_of_intervals_ * interval_, 1s);
 
   EXPECT_CALL(platform_util_, yieldCurrentThread()).Times(testing::AtLeast(1));
@@ -258,7 +258,7 @@ TEST_F(SequencerIntegrationTest, TheHappyFlow) {
 TEST_F(SequencerIntegrationTest, AlwaysSaturatedTargetTest) {
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::saturated_test, this, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, *rate_limiter_, callback,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
                           test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
                           1ms /* Sequencer timeout. */);
 
@@ -278,15 +278,15 @@ TEST_F(SequencerIntegrationTest, GraceTimeoutTest) {
 
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::timeout_test, this, std::placeholders::_1);
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_system_, *rate_limiter_, callback,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
                           test_number_of_intervals_ * interval_ /* Sequencer run time.*/,
                           grace_timeout);
 
-  auto pre_timeout = time_system_.monotonicTime();
+  auto pre_timeout = time_source_.monotonicTime();
   sequencer.start();
   sequencer.waitForCompletion();
 
-  auto diff = time_system_.monotonicTime() - pre_timeout;
+  auto diff = time_source_.monotonicTime() - pre_timeout;
 
   auto expected_duration =
       (test_number_of_intervals_ * interval_) + grace_timeout + EnvoyTimerMinResolution;

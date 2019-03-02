@@ -11,8 +11,7 @@ class OptionInterpreterImpl : public OptionInterpreter {
 public:
   OptionInterpreterImpl(const Options& options);
   std::unique_ptr<BenchmarkClient>
-  createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                        Envoy::Event::TimeSystem& time_system) override;
+  createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) override;
 
   std::unique_ptr<Envoy::Stats::Store> createStatsStore() override;
 

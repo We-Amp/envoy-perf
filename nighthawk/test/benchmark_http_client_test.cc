@@ -13,6 +13,7 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/common/platform_util_impl.h"
@@ -40,8 +41,7 @@ class BenchmarkClientTest : public Envoy::BaseIntegrationTest,
 public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
-        time_system_(timeSystem()), api_(thread_factory_, store_, time_system_),
-        dispatcher_(api_.allocateDispatcher()) {}
+        api_(thread_factory_, store_, timeSystem()), dispatcher_(api_.allocateDispatcher()) {}
 
   static void SetUpTestCase() {
     Envoy::Filesystem::InstanceImpl filesystem;
@@ -87,7 +87,7 @@ public:
                               uint64_t connection_limit, bool use_https, bool use_h2,
                               uint64_t amount_of_request) {
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
-        api_, *dispatcher_, time_system_,
+        api_, *dispatcher_,
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
         use_h2);
 
@@ -128,7 +128,6 @@ public:
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
-  Envoy::Event::TimeSystem& time_system_;
   Envoy::Stats::IsolatedStoreImpl store_;
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;

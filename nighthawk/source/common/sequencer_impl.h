@@ -3,8 +3,8 @@
 #include "common/common/logger.h"
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/thread/thread.h"
 
 #include "nighthawk/common/platform_util.h"

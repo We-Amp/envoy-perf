@@ -1,6 +1,5 @@
 #include "nighthawk/source/client/worker_impl.h"
 
-#include "common/event/real_time_system.h"
 #include "common/stats/isolated_store_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
@@ -15,12 +14,11 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-// TODO(oschaaf): probably want to pass in the time_system.
+// TODO(oschaaf): probably want to pass in the time_source.
 WorkerImpl::WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls)
     : thread_factory_(api.threadFactory()), dispatcher_(api.allocateDispatcher()), tls_(tls),
-      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
-      time_system_(std::make_unique<Envoy::Event::RealTimeSystem>()), started_(false),
-      completed_(false) {
+      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()), time_source_(api.timeSource()),
+      started_(false), completed_(false) {
   tls_.registerThread(*dispatcher_, false);
   runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, *store_, tls_);
 }
@@ -44,7 +42,7 @@ WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy:
                                    int worker_number, uint64_t start_delay_usec)
     : WorkerImpl(api, tls), worker_number_(worker_number), start_delay_usec_(start_delay_usec),
       options_(options) {
-  benchmark_client_ = option_interpreter.createBenchmarkClient(api, *dispatcher_, *time_system_);
+  benchmark_client_ = option_interpreter.createBenchmarkClient(api, *dispatcher_);
 }
 
 void WorkerClientImpl::work() {
@@ -69,10 +67,10 @@ void WorkerClientImpl::work() {
   // accuracy.
   usleep(start_delay_usec_);
 
-  LinearRateLimiter rate_limiter(*time_system_, Frequency(options_.requests_per_second()));
+  LinearRateLimiter rate_limiter(time_source_, Frequency(options_.requests_per_second()));
   SequencerTarget f =
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
-  sequencer_.reset(new SequencerImpl(platform_util, *dispatcher_, *time_system_, rate_limiter, f,
+  sequencer_.reset(new SequencerImpl(platform_util, *dispatcher_, time_source_, rate_limiter, f,
                                      options_.duration(), options_.timeout()));
 
   sequencer_->start();
