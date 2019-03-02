@@ -10,6 +10,7 @@
 
 #include "nighthawk/client/benchmark_client.h"
 #include "nighthawk/client/options.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -25,6 +26,7 @@ public:
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) PURE;
 
   virtual std::unique_ptr<Envoy::Stats::Store> createStatsStore() PURE;
+  virtual std::unique_ptr<Statistic> createStatistic() PURE;
 };
 
 } // namespace Client

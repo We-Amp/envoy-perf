@@ -1,7 +1,9 @@
 #include "nighthawk/source/client/option_interpreter_impl.h"
 
 #include "common/stats/isolated_store_impl.h"
+
 #include "nighthawk/source/client/benchmark_client_impl.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -20,6 +22,10 @@ OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
 
 std::unique_ptr<Envoy::Stats::Store> OptionInterpreterImpl::createStatsStore() {
   return std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
+}
+
+std::unique_ptr<Statistic> OptionInterpreterImpl::createStatistic() {
+  return std::make_unique<HdrStatistic>();
 }
 
 } // namespace Client

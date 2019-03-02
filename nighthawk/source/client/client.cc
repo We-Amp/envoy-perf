@@ -10,9 +10,11 @@
 #include <google/protobuf/util/json_util.h>
 
 #include "common/api/api_impl.h"
+#include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 

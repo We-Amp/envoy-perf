@@ -1,6 +1,8 @@
 #include "nighthawk/source/client/worker_impl.h"
 
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
 
@@ -14,13 +16,13 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-// TODO(oschaaf): probably want to pass in the time_source.
 WorkerImpl::WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls)
     : thread_factory_(api.threadFactory()), dispatcher_(api.allocateDispatcher()), tls_(tls),
-      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()), time_source_(api.timeSource()),
-      started_(false), completed_(false) {
+      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
+      generator_(std::make_unique<Envoy::Runtime::RandomGeneratorImpl>()),
+      time_source_(api.timeSource()), started_(false), completed_(false) {
   tls_.registerThread(*dispatcher_, false);
-  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(generator_, *store_, tls_);
+  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(*generator_, *store_, tls_);
 }
 
 WorkerImpl::~WorkerImpl() { tls_.shutdownThread(); }
@@ -94,16 +96,9 @@ void WorkerClientImpl::work() {
             sequencer_->latencyStatistic().pstdev() / 1000, 2,
             benchmark_client_->countersToString(filter), worker_percentiles);
 
-  // TOOD(oschaaf): Some of the benchmark_client members we call are specific to the
-  // HttpBenchmarkClient. Generalize that in the interface, and re-enable after adjusting for that.
-
   benchmark_client_->terminate();
   dispatcher_->exit();
 }
-
-const Sequencer& WorkerClientImpl::sequencer() const { return *sequencer_; }
-
-const BenchmarkClient& WorkerClientImpl::benchmark_client() const { return *benchmark_client_; }
 
 } // namespace Client
 } // namespace Nighthawk

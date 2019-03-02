@@ -2,11 +2,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/time.h"
+#include "envoy/runtime/runtime.h"
 #include "envoy/stats/store.h"
+#include "envoy/thread/thread.h"
 
 #include "common/common/logger.h"
-#include "common/common/thread_impl.h"
-#include "common/runtime/runtime_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
 #include "nighthawk/client/option_interpreter.h"
@@ -30,8 +30,8 @@ protected:
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::ThreadLocal::Instance& tls_;
   std::unique_ptr<Envoy::Stats::Store> store_;
-  std::unique_ptr<Envoy::Runtime::LoaderImpl> runtime_;
-  Envoy::Runtime::RandomGeneratorImpl generator_;
+  std::unique_ptr<Envoy::Runtime::Loader> runtime_;
+  std::unique_ptr<Envoy::Runtime::RandomGenerator> generator_;
   Envoy::TimeSource& time_source_;
 
 private:
@@ -45,10 +45,6 @@ public:
   WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
                    Envoy::ThreadLocal::Instance& tls, const Options& options, int worker_number,
                    uint64_t start_delay_usec);
-
-  // TODO(oschaaf): get rid of these.
-  const Sequencer& sequencer() const override;
-  const BenchmarkClient& benchmark_client() const;
 
 private:
   void work() override;

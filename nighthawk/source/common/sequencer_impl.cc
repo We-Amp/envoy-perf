@@ -3,8 +3,7 @@
 #include "common/common/assert.h"
 
 #include "nighthawk/common/exception.h"
-
-#include "nighthawk/source/common/platform_util_impl.h"
+#include "nighthawk/common/platform_util.h"
 
 using namespace std::chrono_literals;
 
@@ -21,6 +20,7 @@ SequencerImpl::SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatch
   ASSERT(target_ != nullptr, "No SequencerTarget");
   periodic_timer_ = dispatcher_.createTimer([this]() { run(true); });
   spin_timer_ = dispatcher_.createTimer([this]() { run(false); });
+  // TODO(oschaaf): wire in statistics factory and set up latency/blocked Statistic fields.
 }
 
 void SequencerImpl::start() {
@@ -62,7 +62,7 @@ void SequencerImpl::stop(bool timed_out) {
 void SequencerImpl::updateStatisticOnUnblockIfNeeded(const Envoy::MonotonicTime& now) {
   if (blocked_) {
     blocked_ = false;
-    blocked_statistic_.addValue((now - blocked_start_).count());
+    blocked_statistic_->addValue((now - blocked_start_).count());
   }
 }
 
@@ -102,7 +102,7 @@ void SequencerImpl::run(bool from_periodic_timer) {
     // with that as well.
     const bool target_could_start = target_([this, now]() {
       const auto dur = time_source_.monotonicTime() - now;
-      latency_statistic_.addValue(dur.count());
+      latency_statistic_->addValue(dur.count());
       targets_completed_++;
       // Immediately schedule us to check again, as chances are we can get on with the next task.
       spin_timer_->enableTimer(0ms);

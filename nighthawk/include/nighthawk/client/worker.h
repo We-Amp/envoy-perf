@@ -26,12 +26,6 @@ public:
    */
   virtual void waitForCompletion() PURE;
 
-  /**
-   * Get the associated Sequencer.
-   * @return const Sequencer&
-   */
-  virtual const Sequencer& sequencer() const PURE;
-
 protected:
   /**
    * Perform the actual work on the thread.

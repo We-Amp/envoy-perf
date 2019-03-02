@@ -10,8 +10,7 @@
 #include "nighthawk/common/platform_util.h"
 #include "nighthawk/common/rate_limiter.h"
 #include "nighthawk/common/sequencer.h"
-
-#include "nighthawk/source/common/statistic_impl.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 
@@ -62,8 +61,8 @@ public:
     return usec == 0 ? 0 : ((targets_completed_ / usec) * 1000000);
   }
 
-  const HdrStatistic& blockedStatistic() const override { return blocked_statistic_; }
-  const HdrStatistic& latencyStatistic() const override { return latency_statistic_; }
+  const Statistic& blockedStatistic() const override { return *blocked_statistic_; }
+  const Statistic& latencyStatistic() const override { return *latency_statistic_; }
 
 protected:
   /**
@@ -97,8 +96,8 @@ private:
   PlatformUtil& platform_util_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
-  HdrStatistic blocked_statistic_;
-  HdrStatistic latency_statistic_;
+  std::unique_ptr<Statistic> blocked_statistic_;
+  std::unique_ptr<Statistic> latency_statistic_;
   Envoy::Event::TimerPtr periodic_timer_;
   Envoy::Event::TimerPtr spin_timer_;
   RateLimiter& rate_limiter_;
