@@ -9,6 +9,7 @@
 #include "common/runtime/runtime_impl.h"
 
 #include "nighthawk/client/benchmark_client.h"
+#include "nighthawk/client/option_interpreter.h"
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"
 #include "nighthawk/common/sequencer.h"
@@ -41,8 +42,9 @@ private:
 
 class WorkerClientImpl : public WorkerImpl, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  WorkerClientImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls, const Options& options,
-                   int worker_number, uint64_t start_delay_usec);
+  WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
+                   Envoy::ThreadLocal::Instance& tls, const Options& options, int worker_number,
+                   uint64_t start_delay_usec);
 
   // TODO(oschaaf): get rid of these.
   const Sequencer& sequencer() const override;

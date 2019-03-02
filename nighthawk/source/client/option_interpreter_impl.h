@@ -9,10 +9,15 @@ namespace Client {
 
 class OptionInterpreterImpl : public OptionInterpreter {
 public:
-  std::unique_ptr<BenchmarkClient> createBenchmarkClient(Envoy::Api::Api& api,
-                                                         Envoy::Event::Dispatcher& dispatcher,
-                                                         Envoy::Event::TimeSystem& time_system,
-                                                         const Options& options) override;
+  OptionInterpreterImpl(const Options& options);
+  std::unique_ptr<BenchmarkClient>
+  createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+                        Envoy::Event::TimeSystem& time_system) override;
+
+  std::unique_ptr<Envoy::Stats::Store> createStatsStore() override;
+
+private:
+  const Options& options_;
 };
 
 } // namespace Client

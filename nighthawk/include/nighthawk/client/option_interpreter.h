@@ -24,7 +24,9 @@ public:
   virtual ~OptionInterpreter() = default;
   virtual std::unique_ptr<BenchmarkClient>
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                        Envoy::Event::TimeSystem& time_system, const Options& options) PURE;
+                        Envoy::Event::TimeSystem& time_system) PURE;
+
+  virtual std::unique_ptr<Envoy::Stats::Store> createStatsStore() PURE;
 };
 
 } // namespace Client

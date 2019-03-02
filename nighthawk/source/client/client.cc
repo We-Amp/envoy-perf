@@ -16,6 +16,7 @@
 #include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
+#include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/client/output_formatter_impl.h"
@@ -99,8 +100,10 @@ bool Main::run() {
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerClientImplPtr> workers;
+  OptionInterpreterImpl option_interpreter(*options_);
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
-    workers.push_back(std::make_unique<WorkerClientImpl>(api, tls, *options_, worker_number,
+    workers.push_back(std::make_unique<WorkerClientImpl>(option_interpreter, api, tls, *options_,
+                                                         worker_number,
                                                          inter_worker_delay_usec * worker_number));
   }
 

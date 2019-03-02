@@ -5,7 +5,6 @@
 
 #include "nighthawk/client/benchmark_client.h"
 
-#include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
@@ -40,13 +39,12 @@ void WorkerImpl::waitForCompletion() {
   thread_->join();
 }
 
-WorkerClientImpl::WorkerClientImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls,
-                                   const Options& options, int worker_number,
-                                   uint64_t start_delay_usec)
+WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
+                                   Envoy::ThreadLocal::Instance& tls, const Options& options,
+                                   int worker_number, uint64_t start_delay_usec)
     : WorkerImpl(api, tls), worker_number_(worker_number), start_delay_usec_(start_delay_usec),
       options_(options) {
-  OptionInterpreterImpl interpreter;
-  benchmark_client_ = interpreter.createBenchmarkClient(api, *dispatcher_, *time_system_, options);
+  benchmark_client_ = option_interpreter.createBenchmarkClient(api, *dispatcher_, *time_system_);
 }
 
 void WorkerClientImpl::work() {
