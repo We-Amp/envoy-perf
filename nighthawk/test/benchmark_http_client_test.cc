@@ -19,6 +19,7 @@
 #include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -86,8 +87,10 @@ public:
   void testBasicFunctionality(std::string uriPath, bool allow_pending, uint64_t max_pending,
                               uint64_t connection_limit, bool use_https, bool use_h2,
                               uint64_t amount_of_request) {
+
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
-        api_, *dispatcher_,
+        api_, *dispatcher_, std::make_unique<StreamingStatistic>(),
+        std::make_unique<StreamingStatistic>(),
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
         use_h2);
 

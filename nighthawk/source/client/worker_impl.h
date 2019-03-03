@@ -47,16 +47,16 @@ public:
                    Envoy::ThreadLocal::Instance& tls, const Options& options, int worker_number,
                    uint64_t start_delay_usec);
 
-  const std::vector<NamedStatistic> statistics() const override;
+  StatisticPtrVector statistics() const override;
 
 private:
   void work() override;
 
+  const Options& options_;
+  std::unique_ptr<BenchmarkClient> benchmark_client_;
   std::unique_ptr<Sequencer> sequencer_;
   const int worker_number_;
   const uint64_t start_delay_usec_;
-  const Options& options_;
-  std::unique_ptr<BenchmarkClient> benchmark_client_;
 };
 
 typedef std::unique_ptr<WorkerClientImpl> WorkerClientImplPtr;

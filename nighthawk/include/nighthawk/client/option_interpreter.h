@@ -27,7 +27,7 @@ public:
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) PURE;
 
   virtual std::unique_ptr<Envoy::Stats::Store> createStatsStore() PURE;
-  virtual std::unique_ptr<Statistic> createStatistic() PURE;
+  virtual std::unique_ptr<Statistic> createStatistic(std::string id) PURE;
   virtual std::unique_ptr<PlatformUtil> getPlatformUtil() PURE;
 };
 

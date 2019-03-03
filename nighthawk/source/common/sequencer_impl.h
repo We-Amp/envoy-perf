@@ -62,7 +62,7 @@ public:
     return usec == 0 ? 0 : ((targets_completed_ / usec) * 1000000);
   }
 
-  virtual const std::vector<NamedStatistic> statistics() const override;
+  virtual StatisticPtrVector statistics() const override;
 
   // TODO(oschaaf): These are only used in tests, sanitize.
   const Statistic& blockedStatistic() const { return *blocked_statistic_; }

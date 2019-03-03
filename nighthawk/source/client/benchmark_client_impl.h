@@ -13,10 +13,10 @@
 
 #include "nighthawk/client/benchmark_client.h"
 #include "nighthawk/common/sequencer.h"
+#include "nighthawk/common/statistic.h"
 
 #include "nighthawk/source/client/stream_decoder.h"
 #include "nighthawk/source/common/ssl.h"
-#include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/utility.h"
 
 namespace Nighthawk {
@@ -26,8 +26,8 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public StreamDecoderCompletionCallback,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  // TODO(oschaaf): Pass in a request generator instead of just the request headers.
   BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+                      StatisticPtr&& connect_statistic, StatisticPtr&& response_statistic,
                       const std::string& uri, bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
@@ -50,12 +50,7 @@ public:
 
   void terminate() override { resetPool(); };
 
-  const std::vector<NamedStatistic> statistics() const override {
-    std::vector<NamedStatistic> statistics;
-    statistics.push_back(NamedStatistic{"Pool and connection setup", connect_statistic_});
-    statistics.push_back(NamedStatistic{"Request to response", response_statistic_});
-    return statistics;
-  };
+  StatisticPtrVector statistics() const override;
 
   bool measureLatencies() const override { return measure_latencies_; }
 
@@ -86,8 +81,8 @@ private:
   std::unique_ptr<Envoy::Stats::Store> store_;
   Envoy::Http::HeaderMapImpl request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
-  HdrStatistic response_statistic_;
-  HdrStatistic connect_statistic_;
+  StatisticPtr connect_statistic_;
+  StatisticPtr response_statistic_;
   const bool use_h2_;
   const std::unique_ptr<Uri> uri_;
   // dns_failure_ will be set by syncResolveDns. If false, the benchmark client should be disposed,

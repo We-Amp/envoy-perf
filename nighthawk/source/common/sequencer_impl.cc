@@ -149,10 +149,10 @@ void SequencerImpl::waitForCompletion() {
   ASSERT(!running_);
 }
 
-const std::vector<NamedStatistic> SequencerImpl::statistics() const {
-  std::vector<NamedStatistic> statistics;
-  statistics.push_back(NamedStatistic{"Sequencer observed latency", *latency_statistic_});
-  statistics.push_back(NamedStatistic{"Sequencer observed blocking", *blocked_statistic_});
+StatisticPtrVector SequencerImpl::statistics() const {
+  StatisticPtrVector statistics;
+  statistics.push_back(latency_statistic_.get());
+  statistics.push_back(blocked_statistic_.get());
   return statistics;
 };
 

@@ -14,10 +14,9 @@ OptionInterpreterImpl::OptionInterpreterImpl(const Options& options) : options_(
 std::unique_ptr<BenchmarkClient>
 OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
                                              Envoy::Event::Dispatcher& dispatcher) {
-  auto benchmark_client =
-      std::make_unique<BenchmarkHttpClient>(api, dispatcher, options_.uri(), options_.h2());
-  benchmark_client->set_connection_timeout(options_.timeout());
-  benchmark_client->set_connection_limit(options_.connections());
+  auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
+      api, dispatcher, createStatistic("benchmark_http_client.queue_to_connect"),
+      createStatistic("benchmark_http_client.request_to_response"), options_.uri(), options_.h2());
   return benchmark_client;
 };
 
@@ -25,8 +24,10 @@ std::unique_ptr<Envoy::Stats::Store> OptionInterpreterImpl::createStatsStore() {
   return std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
 }
 
-std::unique_ptr<Statistic> OptionInterpreterImpl::createStatistic() {
-  return std::make_unique<HdrStatistic>();
+std::unique_ptr<Statistic> OptionInterpreterImpl::createStatistic(std::string id) {
+  auto statistic = std::make_unique<HdrStatistic>();
+  statistic->setId(id);
+  return statistic;
 }
 
 std::unique_ptr<PlatformUtil> OptionInterpreterImpl::getPlatformUtil() {

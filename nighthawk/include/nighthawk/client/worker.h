@@ -27,9 +27,9 @@ public:
   /**
    * gets the statistics.
    *
-   * @return const std::vector<NamedStatistic> A vector of Statistics and their respective names.
+   * @return StatisticPtrVector A vector of Statistics.
    */
-  virtual const std::vector<NamedStatistic> statistics() const PURE;
+  virtual StatisticPtrVector statistics() const PURE;
 
 protected:
   /**

@@ -15,12 +15,12 @@
 #include "common/http/http2/conn_pool.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
+#include "nighthawk/common/statistic.h"
+
 #include "nighthawk/source/client/stream_decoder.h"
-#include "nighthawk/source/common/statistic_impl.h"
 
 using namespace std::chrono_literals;
 
@@ -28,9 +28,13 @@ namespace Nighthawk {
 namespace Client {
 
 BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                                         const std::string& uri, bool use_h2)
+                                         StatisticPtr&& connect_statistic,
+                                         StatisticPtr&& response_statistic, const std::string& uri,
+                                         bool use_h2)
     : api_(api), dispatcher_(dispatcher),
-      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()), use_h2_(use_h2),
+      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
+      connect_statistic_(std::move(connect_statistic)),
+      response_statistic_(std::move(response_statistic)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
@@ -38,6 +42,10 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dis
       transport_socket_factory_context_(api.timeSource(), store_->createScope("transport."),
                                         dispatcher_, generator_, *store_, api) {
   ASSERT(uri_->isValid());
+
+  connect_statistic_->setId("benchmark_http_client.queue_to_connect");
+  response_statistic_->setId("benchmark_http_client.request_to_response");
+
   request_headers_.insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_.insertPath().value(uri_->path());
   request_headers_.insertHost().value(uri_->host_and_port());
@@ -118,6 +126,13 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::Loader& runtime) {
   }
 }
 
+StatisticPtrVector BenchmarkHttpClient::statistics() const {
+  StatisticPtrVector statistics;
+  statistics.push_back(connect_statistic_.get());
+  statistics.push_back(response_statistic_.get());
+  return statistics;
+};
+
 bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_callback) {
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
@@ -133,7 +148,7 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
     return false;
   }
 
-  auto stream_decoder = new StreamDecoder(this, connect_statistic_, response_statistic_,
+  auto stream_decoder = new StreamDecoder(this, *connect_statistic_, *response_statistic_,
                                           api_.timeSource(), std::move(caller_completion_callback),
                                           *this, measureLatencies(), request_headers_);
   requests_initiated_++;

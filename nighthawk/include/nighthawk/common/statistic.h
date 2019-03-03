@@ -65,10 +65,13 @@ public:
    * @param statistic The Statistic that should be combined with this instance.
    * @return std::unique_ptr<Statistic> instance.
    */
-  virtual std::unique_ptr<Statistic> combine(const Statistic& statistic) PURE;
+  virtual std::unique_ptr<Statistic> combine(const Statistic& statistic) const PURE;
+
+  virtual std::string id() const PURE;
+  virtual void setId(const std::string& id) PURE;
 };
 
 typedef std::unique_ptr<Statistic> StatisticPtr;
-typedef std::tuple<std::string, const Statistic&> NamedStatistic;
+typedef std::vector<Statistic const*> StatisticPtrVector;
 
 } // namespace Nighthawk

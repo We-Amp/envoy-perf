@@ -42,8 +42,8 @@ void WorkerImpl::waitForCompletion() {
 WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
                                    Envoy::ThreadLocal::Instance& tls, const Options& options,
                                    int worker_number, uint64_t start_delay_usec)
-    : WorkerImpl(api, tls), worker_number_(worker_number), start_delay_usec_(start_delay_usec),
-      options_(options) {
+    : WorkerImpl(api, tls), options_(options), worker_number_(worker_number),
+      start_delay_usec_(start_delay_usec) {
   benchmark_client_ = option_interpreter.createBenchmarkClient(api, *dispatcher_);
 }
 
@@ -73,47 +73,49 @@ void WorkerClientImpl::work() {
   SequencerTarget f =
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
 
-  // TODO(oschaaf): lifetime of the latform util.
+  // TODO(oschaaf): lifetime of the platform util.
   auto platform_util = option_interpreter.getPlatformUtil();
   sequencer_.reset(new SequencerImpl(*platform_util, *dispatcher_, time_source_, rate_limiter, f,
-                                     option_interpreter.createStatistic(),
-                                     option_interpreter.createStatistic(), options_.duration(),
-                                     options_.timeout()));
+                                     option_interpreter.createStatistic("sequencer.blocking"),
+                                     option_interpreter.createStatistic("sequencer.callback"),
+                                     options_.duration(), options_.timeout()));
 
   sequencer_->start();
   sequencer_->waitForCompletion();
 
-  // TODO(oschaaf): need this to be generic.
-  const Statistic& connection_statistic = std::get<1>(benchmark_client_->statistics().front());
-  const Statistic& response_statistic = std::get<1>(benchmark_client_->statistics().back());
+  std::string worker_percentiles = fmt::format("Worker {} results:\n{}", worker_number_, "{}");
 
-  std::string worker_percentiles = fmt::format(
-      "Internal plus connection setup latency percentiles:\n{}\nRequest/response latency "
-      "percentiles:\n{}",
-      connection_statistic.toString(), response_statistic.toString());
+  for (auto statistic : benchmark_client_->statistics()) {
+    worker_percentiles = fmt::format(worker_percentiles, statistic->toString() + "\n{}");
+  }
+  for (auto statistic : sequencer_->statistics()) {
+    worker_percentiles = fmt::format(worker_percentiles, statistic->toString() + "\n{}");
+  }
+
+  worker_percentiles = fmt::format(worker_percentiles, "");
 
   CounterFilter filter = [](std::string, uint64_t value) { return value > 0; };
   ENVOY_LOG(info,
             "> worker {}: {:.{}f}/second. Mean: {:.{}f} μs. pstdev: {:.{}f} μs.\n{}\n"
-            ".\n {}",
+            "{}",
             worker_number_, sequencer_->completionsPerSecond(), 2,
-            std::get<1>(sequencer_->statistics().front()).mean() / 1000, 2,
-            std::get<1>(sequencer_->statistics().back()).pstdev() / 1000, 2,
+            sequencer_->statistics().front()->mean() / 1000, 2,
+            sequencer_->statistics().back()->pstdev() / 1000, 2,
             benchmark_client_->countersToString(filter), worker_percentiles);
 
   benchmark_client_->terminate();
   dispatcher_->exit();
 }
 
-const std::vector<NamedStatistic> WorkerClientImpl::statistics() const {
-  std::vector<NamedStatistic> statistics;
+StatisticPtrVector WorkerClientImpl::statistics() const {
+  StatisticPtrVector statistics;
 
   // TODO(oschaaf): std::insert.
-  for (auto tuple : benchmark_client_->statistics()) {
-    statistics.push_back(tuple);
+  for (auto statistic : benchmark_client_->statistics()) {
+    statistics.push_back(statistic);
   }
-  for (auto tuple : sequencer_->statistics()) {
-    statistics.push_back(tuple);
+  for (auto statistic : sequencer_->statistics()) {
+    statistics.push_back(statistic);
   }
 
   return statistics;

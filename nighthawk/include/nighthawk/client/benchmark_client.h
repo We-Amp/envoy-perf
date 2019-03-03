@@ -36,9 +36,9 @@ public:
   /**
    * gets the statistics.
    *
-   * @return const std::vector<NamedStatistic> A vector of Statistics and their respective names.
+   * @return const std::vector<const Statistic&> A vector of Statistics.
    */
-  virtual const std::vector<NamedStatistic> statistics() const PURE;
+  virtual StatisticPtrVector statistics() const PURE;
 
   // TODO(oschaaf): Consider where this belongs. E.g. "Sequenceable" ?
   // In this interface we would then have "bool startRequest()" or some such, which the sequenceable
