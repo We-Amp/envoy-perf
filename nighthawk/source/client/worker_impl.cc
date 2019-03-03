@@ -42,13 +42,12 @@ void WorkerImpl::waitForCompletion() {
 WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
                                    Envoy::ThreadLocal::Instance& tls, const Options& options,
                                    int worker_number, uint64_t start_delay_usec)
-    : WorkerImpl(api, tls), options_(options), worker_number_(worker_number),
-      start_delay_usec_(start_delay_usec) {
+    : WorkerImpl(api, tls), option_interpreter_(option_interpreter), options_(options),
+      worker_number_(worker_number), start_delay_usec_(start_delay_usec) {
   benchmark_client_ = option_interpreter.createBenchmarkClient(api, *dispatcher_);
 }
 
 void WorkerClientImpl::work() {
-  OptionInterpreterImpl option_interpreter(options_);
   benchmark_client_->initialize(*runtime_);
 
   ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
@@ -74,25 +73,27 @@ void WorkerClientImpl::work() {
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
 
   // TODO(oschaaf): lifetime of the platform util.
-  auto platform_util = option_interpreter.getPlatformUtil();
+  auto platform_util = option_interpreter_.getPlatformUtil();
   sequencer_.reset(new SequencerImpl(*platform_util, *dispatcher_, time_source_, rate_limiter, f,
-                                     option_interpreter.createStatistic("sequencer.blocking"),
-                                     option_interpreter.createStatistic("sequencer.callback"),
+                                     option_interpreter_.createStatistic("sequencer.blocking"),
+                                     option_interpreter_.createStatistic("sequencer.callback"),
                                      options_.duration(), options_.timeout()));
 
   sequencer_->start();
   sequencer_->waitForCompletion();
 
-  std::string worker_percentiles = fmt::format("Worker {} results:\n{}", worker_number_, "{}");
+  std::string worker_percentiles = "{}\n{}";
 
   for (auto statistic : benchmark_client_->statistics()) {
-    worker_percentiles = fmt::format(worker_percentiles, statistic->toString() + "\n{}");
+    worker_percentiles =
+        fmt::format(worker_percentiles, statistic->id(), statistic->toString() + "\n{}\n{}");
   }
   for (auto statistic : sequencer_->statistics()) {
-    worker_percentiles = fmt::format(worker_percentiles, statistic->toString() + "\n{}");
+    worker_percentiles =
+        fmt::format(worker_percentiles, statistic->id(), statistic->toString() + "\n{}\n{}");
   }
 
-  worker_percentiles = fmt::format(worker_percentiles, "");
+  worker_percentiles = fmt::format(worker_percentiles, "", "");
 
   CounterFilter filter = [](std::string, uint64_t value) { return value > 0; };
   ENVOY_LOG(info,

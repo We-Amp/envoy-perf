@@ -155,7 +155,6 @@ bool Main::run() {
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
 
   for (auto& statistic : merged_statistics) {
-    // TODO(oschaaf): run this through valgrind. not 100% sure this is ok.
     *(output.add_statistics()) = statistic->toProto();
   }
 

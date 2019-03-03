@@ -31,5 +31,7 @@ public:
   virtual std::unique_ptr<PlatformUtil> getPlatformUtil() PURE;
 };
 
+typedef std::unique_ptr<OptionInterpreter> OptionInterpreterPtr;
+
 } // namespace Client
 } // namespace Nighthawk

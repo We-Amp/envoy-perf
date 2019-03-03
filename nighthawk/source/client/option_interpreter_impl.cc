@@ -17,6 +17,8 @@ OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
   auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
       api, dispatcher, createStatistic("benchmark_http_client.queue_to_connect"),
       createStatistic("benchmark_http_client.request_to_response"), options_.uri(), options_.h2());
+  benchmark_client->set_connection_timeout(options_.timeout());
+  benchmark_client->set_connection_limit(options_.connections());
   return benchmark_client;
 };
 

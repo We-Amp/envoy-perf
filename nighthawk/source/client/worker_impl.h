@@ -52,6 +52,7 @@ public:
 private:
   void work() override;
 
+  OptionInterpreter& option_interpreter_;
   const Options& options_;
   std::unique_ptr<BenchmarkClient> benchmark_client_;
   std::unique_ptr<Sequencer> sequencer_;
