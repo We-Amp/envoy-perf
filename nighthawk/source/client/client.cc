@@ -10,19 +10,22 @@
 #include <google/protobuf/util/json_util.h>
 
 #include "common/api/api_impl.h"
+#include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/network/utility.h"
+#include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "nighthawk/source/client/benchmark_client_impl.h"
+#include "nighthawk/common/statistic.h"
+
+#include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/client/output_formatter_impl.h"
 #include "nighthawk/source/client/worker_impl.h"
 #include "nighthawk/source/common/frequency.h"
-#include "nighthawk/source/common/statistic_impl.h"
 #include "nighthawk/source/common/utility.h"
 
 using namespace std::chrono_literals;
@@ -33,8 +36,7 @@ namespace Client {
 Main::Main(int argc, const char* const* argv)
     : Main(std::make_unique<Client::OptionsImpl>(argc, argv)) {}
 
-Main::Main(Client::OptionsPtr&& options)
-    : options_(std::move(options)), time_system_(std::make_unique<Envoy::Event::RealTimeSystem>()) {
+Main::Main(Client::OptionsPtr&& options) : options_(std::move(options)) {
   ares_library_init(ARES_LIB_INIT_ALL);
   Envoy::Event::Libevent::Global::initialize();
   configureComponentLogLevels(spdlog::level::from_str(options_->verbosity()));
@@ -84,7 +86,8 @@ bool Main::run() {
   }
 
   Envoy::Stats::IsolatedStoreImpl store;
-  Envoy::Api::Impl api(thread_factory, store, *time_system_);
+  Envoy::Event::RealTimeSystem time_system;
+  Envoy::Api::Impl api(thread_factory, store, time_system);
   Envoy::ThreadLocal::InstanceImpl tls;
   Envoy::Event::DispatcherPtr main_dispatcher(api.allocateDispatcher());
   // TODO(oschaaf): later on, fire up and use a main dispatcher loop as need arises.
@@ -100,19 +103,11 @@ bool Main::run() {
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerClientImplPtr> workers;
+  OptionInterpreterImpl option_interpreter(*options_);
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
-    Envoy::Event::DispatcherPtr dispatcher(api.allocateDispatcher());
-
-    auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
-        api, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher, *time_system_,
-        options_->uri(), std::make_unique<Envoy::Http::HeaderMapImpl>(), options_->h2());
-    benchmark_client->set_connection_timeout(options_->timeout());
-    benchmark_client->set_connection_limit(options_->connections());
-
-    workers.push_back(std::make_unique<WorkerClientImpl>(
-        thread_factory, tls, std::move(dispatcher),
-        std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *options_, worker_number,
-        inter_worker_delay_usec * worker_number, std::move(benchmark_client)));
+    workers.push_back(std::make_unique<WorkerClientImpl>(option_interpreter, api, tls, *options_,
+                                                         worker_number,
+                                                         inter_worker_delay_usec * worker_number));
   }
 
   for (auto& w : workers) {
@@ -123,42 +118,34 @@ bool Main::run() {
     w->waitForCompletion();
   }
 
-  std::unique_ptr<Statistic> sequencer_statistic = std::make_unique<HdrStatistic>();
-  std::unique_ptr<Statistic> blocked_statistic = std::make_unique<HdrStatistic>();
-  std::unique_ptr<Statistic> connection_statistic = std::make_unique<HdrStatistic>();
-  std::unique_ptr<Statistic> response_statistic = std::make_unique<HdrStatistic>();
+  // Compute the merged statistics.
+  std::vector<StatisticPtr> merged_statistics;
+  StatisticPtrVector w0_statistics = workers[0]->statistics();
+  for (auto foo : w0_statistics) {
+    auto new_statistic = option_interpreter.createStatistic();
+    new_statistic->setId(foo->id());
+    merged_statistics.push_back(std::move(new_statistic));
+  }
 
   for (auto& w : workers) {
-    sequencer_statistic = sequencer_statistic->combine(w->sequencer().latencyStatistic());
-    blocked_statistic = blocked_statistic->combine(w->sequencer().blockedStatistic());
-    auto benchmark_client_statistics = w->benchmark_client().statistics();
-    connection_statistic =
-        connection_statistic->combine(std::get<1>(benchmark_client_statistics.front()));
-    response_statistic =
-        response_statistic->combine(std::get<1>(benchmark_client_statistics.back()));
+    for (uint32_t i = 0; i < w->statistics().size(); i++) {
+      auto merged = merged_statistics[i]->combine(*(w->statistics()[i]));
+      merged->setId(merged_statistics[i]->id());
+      merged_statistics.at(i) = std::move(merged);
+    }
   }
 
   tls.shutdownGlobalThreading();
 
-  if (blocked_statistic->count() > 0) {
-    ENVOY_LOG(
-        warn,
-        "Sequencer observed the target to be blocking on {} calls. Latency statistics are skewed.",
-        blocked_statistic->count());
+  std::string cli_result = "Merged statistics:\n{}";
+  for (auto& statistic : merged_statistics) {
+    cli_result = fmt::format(cli_result, statistic->id() + "\n{}");
+    cli_result = fmt::format(cli_result, statistic->toString() + "\n{}");
   }
-
-  std::string cli_result = fmt::format(
-      "Done.\n********************** Global Statistics ******************** \n"
-      "Sequencer timing:\n{}\n"
-      "Request/Response   timing:\n{}\n"
-      "Connection/queuing timing:\n{}\n"
-      "Sequencer blocking:\n{}\n",
-      sequencer_statistic->toString(), response_statistic->toString(),
-      connection_statistic->toString(),
-      blocked_statistic->count() > 0 ? blocked_statistic->toString() : "No blocking was observed.");
-
+  cli_result = fmt::format(cli_result, "");
   ENVOY_LOG(info, "{}", cli_result);
 
+  // Output the statistics to the proto
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
 
@@ -166,8 +153,10 @@ bool Main::run() {
   gettimeofday(&tv, NULL);
   output.mutable_timestamp()->set_seconds(tv.tv_sec);
   output.mutable_timestamp()->set_nanos(tv.tv_usec * 1000);
-  nighthawk::client::Statistic* latency_statistic = output.mutable_latency();
-  *latency_statistic = sequencer_statistic->toProto();
+
+  for (auto& statistic : merged_statistics) {
+    *(output.add_statistics()) = statistic->toProto();
+  }
 
   std::string str;
   google::protobuf::util::JsonPrintOptions options;

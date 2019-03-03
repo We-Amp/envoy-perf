@@ -13,11 +13,13 @@
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/common/platform_util_impl.h"
 #include "nighthawk/source/common/rate_limiter_impl.h"
 #include "nighthawk/source/common/sequencer_impl.h"
+#include "nighthawk/source/common/statistic_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
@@ -40,8 +42,7 @@ class BenchmarkClientTest : public Envoy::BaseIntegrationTest,
 public:
   BenchmarkClientTest()
       : Envoy::BaseIntegrationTest(GetParam(), realTime(), lorem_ipsum_config),
-        time_system_(timeSystem()), api_(thread_factory_, store_, time_system_),
-        dispatcher_(api_.allocateDispatcher()) {}
+        api_(thread_factory_, store_, timeSystem()), dispatcher_(api_.allocateDispatcher()) {}
 
   static void SetUpTestCase() {
     Envoy::Filesystem::InstanceImpl filesystem;
@@ -86,12 +87,12 @@ public:
   void testBasicFunctionality(std::string uriPath, bool allow_pending, uint64_t max_pending,
                               uint64_t connection_limit, bool use_https, bool use_h2,
                               uint64_t amount_of_request) {
-    Envoy::Http::HeaderMapImplPtr request_headers = std::make_unique<Envoy::Http::HeaderMapImpl>();
-    request_headers->insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
+
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
-        api_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(), *dispatcher_, time_system_,
+        api_, *dispatcher_, std::make_unique<StreamingStatistic>(),
+        std::make_unique<StreamingStatistic>(),
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
-        std::move(request_headers), use_h2);
+        use_h2);
 
     client_->set_connection_timeout(10s);
     client_->set_allow_pending_for_test(allow_pending);
@@ -130,7 +131,6 @@ public:
   }
 
   Envoy::Thread::ThreadFactoryImplPosix thread_factory_;
-  Envoy::Event::TimeSystem& time_system_;
   Envoy::Stats::IsolatedStoreImpl store_;
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;

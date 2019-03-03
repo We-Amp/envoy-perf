@@ -9,16 +9,16 @@ using namespace std::chrono_literals;
 
 namespace Nighthawk {
 
-SimulatedTimeAwarePlatformUtil::SimulatedTimeAwarePlatformUtil() : time_system_(nullptr) {}
+SimulatedTimeAwarePlatformUtil::SimulatedTimeAwarePlatformUtil() : time_source_(nullptr) {}
 
 SimulatedTimeAwarePlatformUtil::~SimulatedTimeAwarePlatformUtil() = default;
 
 void SimulatedTimeAwarePlatformUtil::yieldCurrentThread() const {
-  ASSERT(time_system_ != nullptr);
-  time_system_->setMonotonicTime(time_system_->monotonicTime() + TimeResolution);
+  ASSERT(time_source_ != nullptr);
+  time_source_->setMonotonicTime(time_source_->monotonicTime() + TimeResolution);
 }
-void SimulatedTimeAwarePlatformUtil::setTimeSystem(Envoy::Event::SimulatedTimeSystem& time_system) {
-  time_system_ = &time_system;
+void SimulatedTimeAwarePlatformUtil::setTimeSystem(Envoy::Event::SimulatedTimeSystem& time_source) {
+  time_source_ = &time_source;
 }
 
 MockPlatformUtil::MockPlatformUtil() { delegateToSimulatedTimeAwarePlatformUtil(); }

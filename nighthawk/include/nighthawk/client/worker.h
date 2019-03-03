@@ -4,8 +4,6 @@
 
 #include "envoy/common/pure.h"
 
-#include "nighthawk/common/sequencer.h"
-
 namespace Nighthawk {
 namespace Client {
 
@@ -27,10 +25,11 @@ public:
   virtual void waitForCompletion() PURE;
 
   /**
-   * Get the associated Sequencer.
-   * @return const Sequencer&
+   * gets the statistics.
+   *
+   * @return StatisticPtrVector A vector of Statistics.
    */
-  virtual const Sequencer& sequencer() const PURE;
+  virtual StatisticPtrVector statistics() const PURE;
 
 protected:
   /**

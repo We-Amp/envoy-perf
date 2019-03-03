@@ -2,7 +2,6 @@
 
 #include "common/common/logger.h"
 
-#include "envoy/event/timer.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/store.h"
 
@@ -20,7 +19,6 @@ public:
 
 private:
   OptionsPtr options_;
-  std::unique_ptr<Envoy::Event::TimeSystem> time_system_;
   std::unique_ptr<Envoy::Logger::Context> logging_context_;
   Envoy::Network::Address::InstanceConstSharedPtr target_address_;
   void configureComponentLogLevels(spdlog::level::level_enum level);

@@ -3,8 +3,7 @@
 #include "common/common/assert.h"
 
 #include "nighthawk/common/exception.h"
-
-#include "nighthawk/source/common/platform_util_impl.h"
+#include "nighthawk/common/platform_util.h"
 
 using namespace std::chrono_literals;
 
@@ -12,15 +11,19 @@ namespace Nighthawk {
 
 SequencerImpl::SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
                              Envoy::TimeSource& time_source, RateLimiter& rate_limiter,
-                             SequencerTarget& target, std::chrono::microseconds duration,
+                             SequencerTarget& target, StatisticPtr&& latency_statistic,
+                             StatisticPtr&& blocked_statistic, std::chrono::microseconds duration,
                              std::chrono::microseconds grace_timeout)
     : target_(target), platform_util_(platform_util), dispatcher_(dispatcher),
-      time_source_(time_source), rate_limiter_(rate_limiter), duration_(duration),
+      time_source_(time_source), rate_limiter_(rate_limiter),
+      latency_statistic_(std::move(latency_statistic)),
+      blocked_statistic_(std::move(blocked_statistic)), duration_(duration),
       grace_timeout_(grace_timeout), start_(time_source.monotonicTime().min()),
       targets_initiated_(0), targets_completed_(0), running_(false), blocked_(false) {
   ASSERT(target_ != nullptr, "No SequencerTarget");
   periodic_timer_ = dispatcher_.createTimer([this]() { run(true); });
   spin_timer_ = dispatcher_.createTimer([this]() { run(false); });
+  // TODO(oschaaf): wire in statistics factory and set up latency/blocked Statistic fields.
 }
 
 void SequencerImpl::start() {
@@ -62,7 +65,7 @@ void SequencerImpl::stop(bool timed_out) {
 void SequencerImpl::updateStatisticOnUnblockIfNeeded(const Envoy::MonotonicTime& now) {
   if (blocked_) {
     blocked_ = false;
-    blocked_statistic_.addValue((now - blocked_start_).count());
+    blocked_statistic_->addValue((now - blocked_start_).count());
   }
 }
 
@@ -102,7 +105,7 @@ void SequencerImpl::run(bool from_periodic_timer) {
     // with that as well.
     const bool target_could_start = target_([this, now]() {
       const auto dur = time_source_.monotonicTime() - now;
-      latency_statistic_.addValue(dur.count());
+      latency_statistic_->addValue(dur.count());
       targets_completed_++;
       // Immediately schedule us to check again, as chances are we can get on with the next task.
       spin_timer_->enableTimer(0ms);
@@ -145,5 +148,12 @@ void SequencerImpl::waitForCompletion() {
   // We should guarantee the flow terminates, so:
   ASSERT(!running_);
 }
+
+StatisticPtrVector SequencerImpl::statistics() const {
+  StatisticPtrVector statistics;
+  statistics.push_back(latency_statistic_.get());
+  statistics.push_back(blocked_statistic_.get());
+  return statistics;
+};
 
 } // namespace Nighthawk

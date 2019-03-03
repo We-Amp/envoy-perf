@@ -20,6 +20,7 @@ envoy_cc_library(
     srcs = [
         "benchmark_client_impl.cc",
         "client.cc",
+        "option_interpreter_impl.cc",
         "options_impl.cc",
         "output_formatter_impl.cc",
         "stream_decoder.cc",
@@ -28,6 +29,7 @@ envoy_cc_library(
     hdrs = [
         "benchmark_client_impl.h",
         "client.h",
+        "option_interpreter_impl.h",
         "options_impl.h",
         "output_formatter_impl.h",
         "stream_decoder.h",

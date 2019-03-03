@@ -3,15 +3,14 @@
 #include "common/common/logger.h"
 
 #include "envoy/common/pure.h"
+#include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/event/timer.h"
 #include "envoy/thread/thread.h"
 
 #include "nighthawk/common/platform_util.h"
 #include "nighthawk/common/rate_limiter.h"
 #include "nighthawk/common/sequencer.h"
-
-#include "nighthawk/source/common/statistic_impl.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 
@@ -40,6 +39,7 @@ class SequencerImpl : public Sequencer, public Envoy::Logger::Loggable<Envoy::Lo
 public:
   SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
                 Envoy::TimeSource& time_source, RateLimiter& rate_limiter, SequencerTarget& target,
+                StatisticPtr&& latency_statistic, StatisticPtr&& blocked_statistic,
                 std::chrono::microseconds duration, std::chrono::microseconds grace_timeout);
 
   /**
@@ -62,8 +62,11 @@ public:
     return usec == 0 ? 0 : ((targets_completed_ / usec) * 1000000);
   }
 
-  const HdrStatistic& blockedStatistic() const override { return blocked_statistic_; }
-  const HdrStatistic& latencyStatistic() const override { return latency_statistic_; }
+  virtual StatisticPtrVector statistics() const override;
+
+  // TODO(oschaaf): These are only used in tests, sanitize.
+  const Statistic& blockedStatistic() const { return *blocked_statistic_; }
+  const Statistic& latencyStatistic() const { return *latency_statistic_; }
 
 protected:
   /**
@@ -97,11 +100,11 @@ private:
   PlatformUtil& platform_util_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
-  HdrStatistic blocked_statistic_;
-  HdrStatistic latency_statistic_;
+  RateLimiter& rate_limiter_;
+  std::unique_ptr<Statistic> latency_statistic_;
+  std::unique_ptr<Statistic> blocked_statistic_;
   Envoy::Event::TimerPtr periodic_timer_;
   Envoy::Event::TimerPtr spin_timer_;
-  RateLimiter& rate_limiter_;
   std::chrono::microseconds duration_;
   std::chrono::microseconds grace_timeout_;
   Envoy::MonotonicTime start_;
