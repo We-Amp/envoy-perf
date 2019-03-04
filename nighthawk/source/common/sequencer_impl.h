@@ -64,7 +64,6 @@ public:
 
   virtual StatisticPtrVector statistics() const override;
 
-  // TODO(oschaaf): These are only used in tests, sanitize.
   const Statistic& blockedStatistic() const { return *blocked_statistic_; }
   const Statistic& latencyStatistic() const { return *latency_statistic_; }
 

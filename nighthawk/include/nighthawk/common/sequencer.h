@@ -31,7 +31,7 @@ public:
   virtual double completionsPerSecond() const PURE;
 
   /**
-   * gets the statistics.
+   * Gets a vector of associated Statistics.
    *
    * @return StatisticPtrVector A vector of Statistics.
    * Will contain statistics for latency (between calling the SequencerTarget and observing its

@@ -32,17 +32,12 @@ public:
   ~BenchmarkHttpClient() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
-  uint64_t pool_overflow_failures() { return pool_overflow_failures_; }
   uint64_t stream_reset_count() { return stream_reset_count_; }
 
   void set_connection_limit(uint64_t connection_limit) { connection_limit_ = connection_limit; }
   void set_connection_timeout(std::chrono::seconds timeout) { timeout_ = timeout; }
   void set_max_pending_requests(uint64_t max_pending_requests) {
     max_pending_requests_ = max_pending_requests;
-  }
-  // TODO(oschaaf): get rid of this one.
-  void set_allow_pending_for_test(bool allow_pending_for_test) {
-    allow_pending_for_test_ = allow_pending_for_test;
   }
 
   // BenchmarkClient
@@ -99,7 +94,6 @@ private:
   uint64_t stream_reset_count_;
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
-  bool allow_pending_for_test_;
   bool measure_latencies_;
   Ssl::MinimalTransportSocketFactoryContext transport_socket_factory_context_;
 }; // namespace Client

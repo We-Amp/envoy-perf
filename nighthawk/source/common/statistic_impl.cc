@@ -9,8 +9,8 @@
 namespace Nighthawk {
 
 std::string StatisticImpl::toString() const {
-  return fmt::format("Count: {}. Mean: {:.{}f}μs. pstdev: {:.{}f}μs.\n", count(), mean() / 1000, 2,
-                     pstdev() / 1000, 2);
+  return fmt::format("Count: {}. Mean: {:.{}f} μs. pstdev: {:.{}f} μs.\n", count(), mean() / 1000,
+                     2, pstdev() / 1000, 2);
 }
 
 nighthawk::client::Statistic StatisticImpl::toProto() {

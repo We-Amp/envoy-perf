@@ -72,7 +72,6 @@ void WorkerClientImpl::work() {
   SequencerTarget f =
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
 
-  // TODO(oschaaf): lifetime of the platform util.
   auto platform_util = option_interpreter_.getPlatformUtil();
   sequencer_.reset(new SequencerImpl(*platform_util, *dispatcher_, time_source_, rate_limiter, f,
                                      option_interpreter_.createStatistic("sequencer.blocking"),
@@ -96,12 +95,7 @@ void WorkerClientImpl::work() {
   worker_percentiles = fmt::format(worker_percentiles, "", "");
 
   CounterFilter filter = [](std::string, uint64_t value) { return value > 0; };
-  ENVOY_LOG(info,
-            "> worker {}: {:.{}f}/second. Mean: {:.{}f} μs. pstdev: {:.{}f} μs.\n{}\n"
-            "{}",
-            worker_number_, sequencer_->completionsPerSecond(), 2,
-            sequencer_->statistics().front()->mean() / 1000, 2,
-            sequencer_->statistics().back()->pstdev() / 1000, 2,
+  ENVOY_LOG(info, "> worker {}\n{}\n{}", worker_number_,
             benchmark_client_->countersToString(filter), worker_percentiles);
 
   benchmark_client_->terminate();
@@ -111,7 +105,6 @@ void WorkerClientImpl::work() {
 StatisticPtrVector WorkerClientImpl::statistics() const {
   StatisticPtrVector statistics;
 
-  // TODO(oschaaf): std::insert.
   for (auto statistic : benchmark_client_->statistics()) {
     statistics.push_back(statistic);
   }

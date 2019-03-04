@@ -4,6 +4,8 @@
 
 #include "envoy/common/pure.h"
 
+#include "nighthawk/common/statistic.h"
+
 namespace Nighthawk {
 namespace Client {
 
@@ -25,7 +27,7 @@ public:
   virtual void waitForCompletion() PURE;
 
   /**
-   * gets the statistics.
+   * Gets the a vector of Statistic objects associated to the worker and its dependencies.
    *
    * @return StatisticPtrVector A vector of Statistics.
    */
@@ -33,7 +35,7 @@ public:
 
 protected:
   /**
-   * Perform the actual work on the thread.
+   * Perform the actual work on the associated thread.
    */
   virtual void work() PURE;
 };

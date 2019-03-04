@@ -17,8 +17,9 @@ namespace Nighthawk {
 namespace Client {
 
 /**
- * Responsible option handling, meaning construction and configuration of targeted
- * classes/instances.
+ * Factory-like construct, responsible for constructed a few classes/instances where it is expected
+ * configuration needs to be applied. Helps with keeping includes to just the interfaces in other
+ * places. Will probably be decomposed into real factory constructs later on.
  */
 class OptionInterpreter {
 public:

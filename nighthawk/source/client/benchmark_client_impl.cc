@@ -1,11 +1,8 @@
 #include "nighthawk/source/client/benchmark_client_impl.h"
 
-#include "common/http/utility.h"
-#include "common/network/utility.h"
+#include "absl/strings/str_split.h"
 
 #include "ares.h"
-
-#include "absl/strings/str_split.h"
 
 #include "common/common/compiler_requirements.h"
 #include "common/event/dispatcher_impl.h"
@@ -13,6 +10,7 @@
 #include "common/http/headers.h"
 #include "common/http/http1/conn_pool.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -38,7 +36,7 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dis
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      allow_pending_for_test_(false), measure_latencies_(false),
+      measure_latencies_(false),
       transport_socket_factory_context_(api.timeSource(), store_->createScope("transport."),
                                         dispatcher_, generator_, *store_, api) {
   ASSERT(uri_->isValid());
@@ -140,8 +138,7 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
       // isn't used for h/1 (it is used in tcp and h2 though).
       // Note: this improves accuracy, but some tests rely on pending requests functional
       // to queue up requests.
-      || (!allow_pending_for_test_ &&
-          (requests_initiated_ - requests_completed_) >= connection_limit_)) {
+      || ((requests_initiated_ - requests_completed_) >= connection_limit_)) {
     return false;
   }
 
@@ -186,7 +183,8 @@ void BenchmarkHttpClient::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailure
   case Envoy::Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
     break;
   case Envoy::Http::ConnectionPool::PoolFailureReason::Overflow:
-    pool_overflow_failures_++;
+    // We do not expect this to happen, at least not right now.
+    ASSERT(false);
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

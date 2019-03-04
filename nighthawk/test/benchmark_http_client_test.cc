@@ -84,9 +84,8 @@ public:
     fake_upstreams_.clear();
   }
 
-  void testBasicFunctionality(std::string uriPath, bool allow_pending, uint64_t max_pending,
-                              uint64_t connection_limit, bool use_https, bool use_h2,
-                              uint64_t amount_of_request) {
+  void testBasicFunctionality(std::string uriPath, uint64_t max_pending, uint64_t connection_limit,
+                              bool use_https, bool use_h2, uint64_t amount_of_request) {
 
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
         api_, *dispatcher_, std::make_unique<StreamingStatistic>(),
@@ -95,7 +94,6 @@ public:
         use_h2);
 
     client_->set_connection_timeout(10s);
-    client_->set_allow_pending_for_test(allow_pending);
     client_->set_max_pending_requests(max_pending);
     client_->set_connection_limit(connection_limit);
     client_->initialize(runtime_);
@@ -116,13 +114,11 @@ public:
       }
     }
 
-    EXPECT_EQ(allow_pending ? amount : 1, inflight_response_count);
+    EXPECT_EQ(max_pending, inflight_response_count);
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
     EXPECT_EQ(0, client_->stream_reset_count());
-    // We throttle before the pool, so we expect no pool overflows.
-    EXPECT_EQ(0, client_->pool_overflow_failures());
   }
 
   std::string getChangedCounters() {
@@ -145,11 +141,8 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
                         testing::ValuesIn({Envoy::Network::Address::IpVersion::v4}),
                         Envoy::TestUtility::ipTestParamsToString);
 
-// TODO(oschaaf): this is kind of write-only code, it's not possible to understand the tests
-// based on the args we pass to testBasicfunctionality(). Fix this by adding comments.
-
 TEST_P(BenchmarkClientTest, BasicTestH1) {
-  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, false, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
 client.upstream_rq_total:1\n\
 client.upstream_rq_pending_total:1\n\
@@ -160,7 +153,7 @@ client.upstream_cx_tx_bytes_total:82\n",
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH1404) {
-  testBasicFunctionality("/lorem-ipsum-status-404", false, 1, 1, false, false, 10);
+  testBasicFunctionality("/lorem-ipsum-status-404", 1, 1, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
 client.upstream_rq_total:1\n\
 client.upstream_rq_pending_total:1\n\
@@ -172,7 +165,7 @@ client.upstream_cx_tx_bytes_total:82\n",
 }
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
-  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, true, false, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
 client.upstream_rq_total:1\n\
 client.upstream_rq_pending_total:1\n\
@@ -185,12 +178,12 @@ client.upstream_cx_tx_bytes_total:82\n",
 // The following two are disabled because of trouble with runtime initialization, causing them
 // to crash out.
 TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) {
-  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, true, true, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, true, 10);
   EXPECT_EQ("todo", getChangedCounters());
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH2C) {
-  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, true, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, true, 10);
   EXPECT_EQ("client.upstream_rq_total:1\n\
 client.upstream_rq_pending_total:1\n\
 client.upstream_cx_total:1\n\
@@ -204,7 +197,7 @@ TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
   // Kill the test server, so we can't connect.
   // We allow a single connection and no pending. We expect one connection failure.
   test_server_.reset();
-  testBasicFunctionality("/lorem-ipsum-status-200", false, 1, 1, false, false, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
 client.upstream_rq_pending_failure_eject:1\n\
 client.upstream_rq_total:1\n\
@@ -218,7 +211,7 @@ TEST_P(BenchmarkClientTest, H1MultiConnectionFailure) {
   // Kill the test server, so we can't connect.
   // We allow a ten connections and ten pending requests. We expect ten connection failures.
   test_server_.reset();
-  testBasicFunctionality("/lorem-ipsum-status-200", true, 10, 10, false, false, 10);
+  testBasicFunctionality("/lorem-ipsum-status-200", 10, 10, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:10\n\
 client.upstream_rq_pending_failure_eject:10\n\
 client.upstream_rq_total:10\n\
