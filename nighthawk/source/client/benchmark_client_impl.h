@@ -1,13 +1,5 @@
 #pragma once
 
-#include "common/common/logger.h"
-#include "common/http/header_map_impl.h"
-#include "common/runtime/runtime_impl.h"
-
-#include "nighthawk/client/benchmark_client.h"
-#include "nighthawk/common/sequencer.h"
-#include "nighthawk/common/statistic.h"
-
 #include "envoy/api/api.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/conn_pool.h"
@@ -15,6 +7,14 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/store.h"
 #include "envoy/upstream/upstream.h"
+
+#include "nighthawk/client/benchmark_client.h"
+#include "nighthawk/common/sequencer.h"
+#include "nighthawk/common/statistic.h"
+
+#include "common/common/logger.h"
+#include "common/http/header_map_impl.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "nighthawk/source/client/stream_decoder.h"
 #include "nighthawk/source/common/ssl.h"

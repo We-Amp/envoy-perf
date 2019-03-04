@@ -6,6 +6,10 @@
 
 #include "nighthawk/common/statistic.h"
 
+// TODO(oschaaf): Arguably Worker belongs in /common instead of here in /client.
+// However, have also have WorkerClient(Impl), and I feel splitting this over two places is overkill
+// right now.
+
 namespace Nighthawk {
 namespace Client {
 

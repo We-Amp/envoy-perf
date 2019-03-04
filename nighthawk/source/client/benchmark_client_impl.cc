@@ -130,15 +130,13 @@ StatisticPtrVector BenchmarkClientHttpImpl::statistics() const {
 };
 
 bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completion_callback) {
-  // In closed loop we want to be able to control the pacing as
-  // exactly as possible.
-  // TODO(oschaaf): We can't rely on resourceManager()::requests() because that
-  // isn't used for h/1 (it is used in tcp and h2 though).
-  // Note: this improves accuracy, but some tests rely on pending requests functional
-  // to queue up requests.
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
            .canCreate() ||
+      // In closed loop mode we want to be able to control the pacing as exactly as possible.
+      // In open-loop mode we probably want to skip this.
+      // NOTE(oschaaf): We can't consistently rely on resourceManager()::requests() because that
+      // isn't used for h/1 (it is used in tcp and h2 though).
       ((requests_initiated_ - requests_completed_) >= connection_limit_)) {
     return false;
   }
@@ -172,7 +170,6 @@ void BenchmarkClientHttpImpl::onComplete(bool success, const Envoy::Http::Header
     const int64_t status = Envoy::Http::Utility::getResponseStatus(headers);
     if (status >= 400 && status <= 599) {
       // TODO(oschaaf): Figure out why this isn't incremented for us.
-      // TODO(oschaaf): don't get this stat each time, cache it?
       store_->counter("client.upstream_cx_protocol_error").inc();
     }
   }
