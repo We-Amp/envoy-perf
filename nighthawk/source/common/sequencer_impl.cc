@@ -23,7 +23,6 @@ SequencerImpl::SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatch
   ASSERT(target_ != nullptr, "No SequencerTarget");
   periodic_timer_ = dispatcher_.createTimer([this]() { run(true); });
   spin_timer_ = dispatcher_.createTimer([this]() { run(false); });
-  // TODO(oschaaf): wire in statistics factory and set up latency/blocked Statistic fields.
 }
 
 void SequencerImpl::start() {
@@ -45,7 +44,7 @@ void SequencerImpl::stop(bool timed_out) {
   periodic_timer_.reset();
   spin_timer_.reset();
   dispatcher_.exit();
-  updateStatisticOnUnblockIfNeeded(time_source_.monotonicTime());
+  unblockAndUpdateStatisticIfNeeded(time_source_.monotonicTime());
 
   if (timed_out) {
     ENVOY_LOG(warn,
@@ -62,7 +61,7 @@ void SequencerImpl::stop(bool timed_out) {
   }
 }
 
-void SequencerImpl::updateStatisticOnUnblockIfNeeded(const Envoy::MonotonicTime& now) {
+void SequencerImpl::unblockAndUpdateStatisticIfNeeded(const Envoy::MonotonicTime& now) {
   if (blocked_) {
     blocked_ = false;
     blocked_statistic_->addValue((now - blocked_start_).count());
@@ -112,7 +111,7 @@ void SequencerImpl::run(bool from_periodic_timer) {
     });
 
     if (target_could_start) {
-      updateStatisticOnUnblockIfNeeded(now);
+      unblockAndUpdateStatisticIfNeeded(now);
       targets_initiated_++;
     } else {
       // This should only happen when we are running in closed-loop mode.The target wasn't able to
