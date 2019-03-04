@@ -11,7 +11,7 @@
 namespace Nighthawk {
 namespace Client {
 
-class BenchmarkHttpClient;
+class BenchmarkClientHttpImpl;
 
 class StreamDecoderCompletionCallback {
 public:

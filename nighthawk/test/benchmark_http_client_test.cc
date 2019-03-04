@@ -87,7 +87,7 @@ public:
   void testBasicFunctionality(std::string uriPath, uint64_t max_pending, uint64_t connection_limit,
                               bool use_https, bool use_h2, uint64_t amount_of_request) {
 
-    client_ = std::make_unique<Client::BenchmarkHttpClient>(
+    client_ = std::make_unique<Client::BenchmarkClientHttpImpl>(
         api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
         std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
@@ -117,6 +117,8 @@ public:
     EXPECT_EQ(max_pending, inflight_response_count);
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+    client_->terminate();
+
     EXPECT_EQ(0, client_->stream_reset_count());
   }
 
@@ -132,7 +134,7 @@ public:
   Envoy::Runtime::RandomGeneratorImpl generator_;
   Envoy::ThreadLocal::InstanceImpl tls_;
   ::testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
-  std::unique_ptr<Client::BenchmarkHttpClient> client_;
+  std::unique_ptr<Client::BenchmarkClientHttpImpl> client_;
 };
 
 INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,

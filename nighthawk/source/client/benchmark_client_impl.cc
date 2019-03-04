@@ -4,8 +4,10 @@
 
 #include "ares.h"
 
+#include "envoy/event/dispatcher.h"
+#include "envoy/thread_local/thread_local.h"
+
 #include "common/common/compiler_requirements.h"
-#include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/http1/conn_pool.h"
@@ -13,7 +15,6 @@
 #include "common/http/utility.h"
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
-#include "common/thread_local/thread_local_impl.h"
 #include "common/upstream/cluster_manager_impl.h"
 
 #include "nighthawk/common/statistic.h"
@@ -25,11 +26,12 @@ using namespace std::chrono_literals;
 namespace Nighthawk {
 namespace Client {
 
-BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                                         Envoy::Stats::StorePtr&& store,
-                                         StatisticPtr&& connect_statistic,
-                                         StatisticPtr&& response_statistic, const std::string& uri,
-                                         bool use_h2)
+BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
+                                                 Envoy::Event::Dispatcher& dispatcher,
+                                                 Envoy::Stats::StorePtr&& store,
+                                                 StatisticPtr&& connect_statistic,
+                                                 StatisticPtr&& response_statistic,
+                                                 const std::string& uri, bool use_h2)
     : api_(api), dispatcher_(dispatcher), store_(std::move(store)),
       connect_statistic_(std::move(connect_statistic)),
       response_statistic_(std::move(response_statistic)), use_h2_(use_h2),
@@ -49,7 +51,7 @@ BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dis
                                             : Envoy::Http::Headers::get().SchemeValues.Http);
 }
 
-void BenchmarkHttpClient::syncResolveDns() {
+void BenchmarkClientHttpImpl::syncResolveDns() {
   auto dns_resolver = dispatcher_.createDnsResolver({});
   Envoy::Network::ActiveDnsQuery* active_dns_query_ = dns_resolver->resolve(
       uri_->host_without_port(), Envoy::Network::DnsLookupFamily::V4Only,
@@ -71,7 +73,7 @@ void BenchmarkHttpClient::syncResolveDns() {
   dispatcher_.run(Envoy::Event::Dispatcher::RunType::Block);
 }
 
-void BenchmarkHttpClient::initialize(Envoy::Runtime::Loader& runtime) {
+void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   syncResolveDns();
 
   envoy::api::v2::Cluster cluster_config;
@@ -121,14 +123,14 @@ void BenchmarkHttpClient::initialize(Envoy::Runtime::Loader& runtime) {
   }
 }
 
-StatisticPtrVector BenchmarkHttpClient::statistics() const {
+StatisticPtrVector BenchmarkClientHttpImpl::statistics() const {
   StatisticPtrVector statistics;
   statistics.push_back(connect_statistic_.get());
   statistics.push_back(response_statistic_.get());
   return statistics;
 };
 
-bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_callback) {
+bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completion_callback) {
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
            .canCreate()
@@ -151,7 +153,7 @@ bool BenchmarkHttpClient::tryStartOne(std::function<void()> caller_completion_ca
   return true;
 }
 
-std::string BenchmarkHttpClient::countersToString(CounterFilter filter) const {
+std::string BenchmarkClientHttpImpl::countersToString(CounterFilter filter) const {
   auto counters = store_->counters();
   std::string s;
 
@@ -163,7 +165,7 @@ std::string BenchmarkHttpClient::countersToString(CounterFilter filter) const {
   return s;
 }
 
-void BenchmarkHttpClient::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {
+void BenchmarkClientHttpImpl::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {
   requests_completed_++;
   if (!success) {
     stream_reset_count_++;
@@ -178,7 +180,7 @@ void BenchmarkHttpClient::onComplete(bool success, const Envoy::Http::HeaderMap&
   }
 }
 
-void BenchmarkHttpClient::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) {
+void BenchmarkClientHttpImpl::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) {
   switch (reason) {
   case Envoy::Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
     break;

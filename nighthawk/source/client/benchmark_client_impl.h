@@ -23,14 +23,14 @@
 namespace Nighthawk {
 namespace Client {
 
-class BenchmarkHttpClient : public BenchmarkClient,
-                            public StreamDecoderCompletionCallback,
-                            public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
+class BenchmarkClientHttpImpl : public BenchmarkClient,
+                                public StreamDecoderCompletionCallback,
+                                public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
-  BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                      Envoy::Stats::StorePtr&& store, StatisticPtr&& connect_statistic,
-                      StatisticPtr&& response_statistic, const std::string& uri, bool use_h2);
-  ~BenchmarkHttpClient() override = default;
+  BenchmarkClientHttpImpl(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+                          Envoy::Stats::StorePtr&& store, StatisticPtr&& connect_statistic,
+                          StatisticPtr&& response_statistic, const std::string& uri, bool use_h2);
+  ~BenchmarkClientHttpImpl() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
   uint64_t stream_reset_count() { return stream_reset_count_; }

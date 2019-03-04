@@ -14,7 +14,7 @@ OptionInterpreterImpl::OptionInterpreterImpl(const Options& options) : options_(
 std::unique_ptr<BenchmarkClient>
 OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
                                              Envoy::Event::Dispatcher& dispatcher) {
-  auto benchmark_client = std::make_unique<BenchmarkHttpClient>(
+  auto benchmark_client = std::make_unique<BenchmarkClientHttpImpl>(
       api, dispatcher, createStatsStore(),
       createStatistic("benchmark_http_client.queue_to_connect"),
       createStatistic("benchmark_http_client.request_to_response"), options_.uri(), options_.h2());
