@@ -1,10 +1,10 @@
+
 #pragma once
 
 #include <functional>
 
 #include "envoy/common/pure.h"
 
-#include "nighthawk/common/rate_limiter.h"
 #include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {

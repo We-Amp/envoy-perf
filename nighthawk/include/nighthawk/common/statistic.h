@@ -67,7 +67,16 @@ public:
    */
   virtual std::unique_ptr<Statistic> combine(const Statistic& statistic) const PURE;
 
+  /**
+   * Gets the id of the Statistic instance, which is an empty string when not set.
+   * @return std::string The id of the Statistic instance.
+   */
   virtual std::string id() const PURE;
+
+  /**
+   * Sets the id of the Statistic instance.
+   * @param id The id that should be set for the Statistic instance.
+   */
   virtual void setId(const std::string& id) PURE;
 };
 

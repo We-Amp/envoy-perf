@@ -166,7 +166,7 @@ std::string HdrStatistic::toString() const {
   std::stringstream stream;
 
   stream << StatisticImpl::toString();
-  stream << fmt::format("{:>12} {:>14} (usec)", "Percentile", "Time") << std::endl;
+  stream << fmt::format("{:>12} {:>14} (usec)", "Percentile", "Value") << std::endl;
 
   std::vector<double> percentiles{50.0, 75.0, 90.0, 99.0, 99.9, 99.99, 99.999, 100.0};
   for (uint64_t i = 0; i < percentiles.size(); i++) {
