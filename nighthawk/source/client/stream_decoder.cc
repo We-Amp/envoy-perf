@@ -1,5 +1,7 @@
 #include "nighthawk/source/client/stream_decoder.h"
 
+#include "nighthawk/source/client/benchmark_client_impl.h"
+
 #include "common/http/http1/codec_impl.h"
 #include "common/http/utility.h"
 
@@ -30,7 +32,7 @@ void StreamDecoder::onComplete(bool success) {
     latency_statistic_.addValue((time_source_.monotonicTime() - request_start_).count());
   }
   ASSERT(complete_);
-  on_complete_cb_.onComplete(success, *response_headers_);
+  decoder_completion_callback_.onComplete(success, *response_headers_);
   caller_completion_callback_();
   delete this;
 }
@@ -39,7 +41,7 @@ void StreamDecoder::onResetStream(Envoy::Http::StreamResetReason) { onComplete(f
 
 void StreamDecoder::onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason,
                                   Envoy::Upstream::HostDescriptionConstSharedPtr) {
-  benchmark_client_->onPoolFailure(reason);
+  decoder_completion_callback_.onPoolFailure(reason);
 }
 
 void StreamDecoder::onPoolReady(Envoy::Http::StreamEncoder& encoder,

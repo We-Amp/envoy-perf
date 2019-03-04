@@ -78,7 +78,6 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
 
   envoy::api::v2::Cluster cluster_config;
   envoy::api::v2::core::BindConfig bind_config;
-  // envoy::config::bootstrap::v2::Runtime runtime_config;
 
   auto thresholds = cluster_config.mutable_circuit_breakers()->add_thresholds();
 
@@ -131,25 +130,24 @@ StatisticPtrVector BenchmarkClientHttpImpl::statistics() const {
 };
 
 bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completion_callback) {
+  // In closed loop we want to be able to control the pacing as
+  // exactly as possible.
+  // TODO(oschaaf): We can't rely on resourceManager()::requests() because that
+  // isn't used for h/1 (it is used in tcp and h2 though).
+  // Note: this improves accuracy, but some tests rely on pending requests functional
+  // to queue up requests.
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
-           .canCreate()
-      // In closed loop we want to be able to control the pacing as
-      // exactly as possible.
-      // TODO(oschaaf): We can't rely on resourceManager()::requests() because that
-      // isn't used for h/1 (it is used in tcp and h2 though).
-      // Note: this improves accuracy, but some tests rely on pending requests functional
-      // to queue up requests.
-      || ((requests_initiated_ - requests_completed_) >= connection_limit_)) {
+           .canCreate() ||
+      ((requests_initiated_ - requests_completed_) >= connection_limit_)) {
     return false;
   }
 
-  auto stream_decoder = new StreamDecoder(this, *connect_statistic_, *response_statistic_,
-                                          api_.timeSource(), std::move(caller_completion_callback),
-                                          *this, measureLatencies(), request_headers_);
+  auto stream_decoder = new StreamDecoder(
+      api_.timeSource(), *this, std::move(caller_completion_callback), *connect_statistic_,
+      *response_statistic_, request_headers_, measureLatencies());
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *stream_decoder);
-
   return true;
 }
 
