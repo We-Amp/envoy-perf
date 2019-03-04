@@ -166,14 +166,16 @@ TYPED_TEST(TypedStatisticTest, OneMillionRandomSamples) {
 TYPED_TEST(TypedStatisticTest, ProtoOutput) {
   TypeParam a;
 
+  a.setId("foo");
   a.addValue(6543456);
   a.addValue(342335);
 
   const nighthawk::client::Statistic proto = a.toProto();
 
-  EXPECT_EQ(proto.count(), 2);
-  EXPECT_EQ(proto.mean().nanos(), std::round(a.mean()));
-  EXPECT_EQ(proto.pstdev().nanos(), std::round(a.pstdev()));
+  EXPECT_EQ("foo", proto.id());
+  EXPECT_EQ(2, proto.count());
+  EXPECT_EQ(std::round(a.mean()), proto.mean().nanos());
+  EXPECT_EQ(std::round(a.pstdev()), proto.pstdev().nanos());
 }
 
 TYPED_TEST(TypedStatisticTest, ProtoOutputEmptyStats) {
