@@ -5,6 +5,7 @@
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/address.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/stats/store.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/logger.h"
@@ -27,8 +28,8 @@ class BenchmarkHttpClient : public BenchmarkClient,
                             public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
-                      StatisticPtr&& connect_statistic, StatisticPtr&& response_statistic,
-                      const std::string& uri, bool use_h2);
+                      Envoy::Stats::StorePtr&& store, StatisticPtr&& connect_statistic,
+                      StatisticPtr&& response_statistic, const std::string& uri, bool use_h2);
   ~BenchmarkHttpClient() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
@@ -73,7 +74,7 @@ private:
 
   Envoy::Api::Api& api_;
   Envoy::Event::Dispatcher& dispatcher_;
-  std::unique_ptr<Envoy::Stats::Store> store_;
+  Envoy::Stats::StorePtr store_;
   Envoy::Http::HeaderMapImpl request_headers_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   StatisticPtr connect_statistic_;

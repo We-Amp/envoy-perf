@@ -38,9 +38,10 @@ using SequencerTarget = std::function<bool(std::function<void()>)>;
 class SequencerImpl : public Sequencer, public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   SequencerImpl(PlatformUtil& platform_util, Envoy::Event::Dispatcher& dispatcher,
-                Envoy::TimeSource& time_source, RateLimiter& rate_limiter, SequencerTarget& target,
-                StatisticPtr&& latency_statistic, StatisticPtr&& blocked_statistic,
-                std::chrono::microseconds duration, std::chrono::microseconds grace_timeout);
+                Envoy::TimeSource& time_source, RateLimiterPtr&& rate_limiter,
+                SequencerTarget target, StatisticPtr&& latency_statistic,
+                StatisticPtr&& blocked_statistic, std::chrono::microseconds duration,
+                std::chrono::microseconds grace_timeout);
 
   /**
    * Starts the Sequencer. Should be followed up with a call to waitForCompletion().
@@ -100,13 +101,13 @@ protected:
   void updateStartBlockingTimeIfNeeded();
 
 private:
-  SequencerTarget& target_;
+  SequencerTarget target_;
   PlatformUtil& platform_util_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::TimeSource& time_source_;
-  RateLimiter& rate_limiter_;
-  std::unique_ptr<Statistic> latency_statistic_;
-  std::unique_ptr<Statistic> blocked_statistic_;
+  std::unique_ptr<RateLimiter> rate_limiter_;
+  StatisticPtr latency_statistic_;
+  StatisticPtr blocked_statistic_;
   Envoy::Event::TimerPtr periodic_timer_;
   Envoy::Event::TimerPtr spin_timer_;
   std::chrono::microseconds duration_;

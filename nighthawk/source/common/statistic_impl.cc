@@ -43,7 +43,7 @@ double SimpleStatistic::pvariance() const { return (sum_x2_ / count_) - (mean() 
 
 double SimpleStatistic::pstdev() const { return sqrt(pvariance()); }
 
-std::unique_ptr<Statistic> SimpleStatistic::combine(const Statistic& statistic) const {
+StatisticPtr SimpleStatistic::combine(const Statistic& statistic) const {
   const SimpleStatistic& a = *this;
   const SimpleStatistic& b = dynamic_cast<const SimpleStatistic&>(statistic);
   auto combined = std::make_unique<SimpleStatistic>();
@@ -73,7 +73,7 @@ double StreamingStatistic::pvariance() const { return accumulated_variance_ / co
 
 double StreamingStatistic::pstdev() const { return sqrt(pvariance()); }
 
-std::unique_ptr<Statistic> StreamingStatistic::combine(const Statistic& statistic) const {
+StatisticPtr StreamingStatistic::combine(const Statistic& statistic) const {
   const StreamingStatistic& a = *this;
   const StreamingStatistic& b = dynamic_cast<const StreamingStatistic&>(statistic);
   auto combined = std::make_unique<StreamingStatistic>();
@@ -101,7 +101,7 @@ double InMemoryStatistic::mean() const { return streaming_stats_->mean(); }
 double InMemoryStatistic::pvariance() const { return streaming_stats_->pvariance(); }
 double InMemoryStatistic::pstdev() const { return streaming_stats_->pstdev(); }
 
-std::unique_ptr<Statistic> InMemoryStatistic::combine(const Statistic& statistic) const {
+StatisticPtr InMemoryStatistic::combine(const Statistic& statistic) const {
   auto combined = std::make_unique<InMemoryStatistic>();
   const InMemoryStatistic& b = dynamic_cast<const InMemoryStatistic&>(statistic);
 
@@ -147,7 +147,7 @@ double HdrStatistic::mean() const { return hdr_mean(histogram_); }
 double HdrStatistic::pvariance() const { return pstdev() * pstdev(); }
 double HdrStatistic::pstdev() const { return hdr_stddev(histogram_); }
 
-std::unique_ptr<Statistic> HdrStatistic::combine(const Statistic& statistic) const {
+StatisticPtr HdrStatistic::combine(const Statistic& statistic) const {
   auto combined = std::make_unique<HdrStatistic>();
   const HdrStatistic& b = dynamic_cast<const HdrStatistic&>(statistic);
 

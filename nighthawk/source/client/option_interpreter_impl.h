@@ -11,9 +11,9 @@ public:
   std::unique_ptr<BenchmarkClient>
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) override;
 
-  std::unique_ptr<Envoy::Stats::Store> createStatsStore() override;
-  std::unique_ptr<Statistic> createStatistic(std::string id = "") override;
-  std::unique_ptr<PlatformUtil> getPlatformUtil() override;
+  Envoy::Stats::StorePtr createStatsStore() override;
+  StatisticPtr createStatistic(std::string id = "") override;
+  PlatformUtilPtr getPlatformUtil() override;
 
 private:
   const Options& options_;

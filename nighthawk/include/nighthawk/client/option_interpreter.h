@@ -27,9 +27,9 @@ public:
   virtual std::unique_ptr<BenchmarkClient>
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) PURE;
 
-  virtual std::unique_ptr<Envoy::Stats::Store> createStatsStore() PURE;
-  virtual std::unique_ptr<Statistic> createStatistic(std::string id) PURE;
-  virtual std::unique_ptr<PlatformUtil> getPlatformUtil() PURE;
+  virtual Envoy::Stats::StorePtr createStatsStore() PURE;
+  virtual StatisticPtr createStatistic(std::string id) PURE;
+  virtual PlatformUtilPtr getPlatformUtil() PURE;
 };
 
 typedef std::unique_ptr<OptionInterpreter> OptionInterpreterPtr;

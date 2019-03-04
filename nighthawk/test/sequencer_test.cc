@@ -52,16 +52,19 @@ public:
   const Frequency frequency_;
   const std::chrono::milliseconds interval_;
   const uint64_t test_number_of_intervals_;
-  std::unique_ptr<RateLimiter> rate_limiter_;
   SequencerTarget sequencer_target_;
 };
 
 class SequencerTest : public SequencerTestBase {
 public:
-  SequencerTest() { rate_limiter_ = std::make_unique<MockRateLimiter>(); }
-  virtual MockRateLimiter& getRateLimiter() const {
-    return dynamic_cast<MockRateLimiter&>(*rate_limiter_);
-  }
+  SequencerTest()
+      : rate_limiter_(std::make_unique<MockRateLimiter>()),
+        rate_limiter_unsafe_ref_(*rate_limiter_) {}
+
+  std::unique_ptr<MockRateLimiter> rate_limiter_;
+  // The sequencers that the tests construct will take ownership of rate_limiter_, we keep a
+  // reference, which will become invalid once the sequencer has been destructed.
+  MockRateLimiter& rate_limiter_unsafe_ref_;
 };
 
 class SequencerTestWithTimerEmulation : public SequencerTest {
@@ -137,11 +140,11 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterInteraction) {
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
   SequencerImpl sequencer(
-      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      platform_util_, *dispatcher_, time_source_, std::move(rate_limiter_), callback,
       std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
       test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 1ms /* Sequencer timeout. */);
   // Have the mock rate limiter gate two calls, and block everything else.
-  EXPECT_CALL(getRateLimiter(), tryAcquireOne())
+  EXPECT_CALL(rate_limiter_unsafe_ref_, tryAcquireOne())
       .Times(testing::AtLeast(3))
       .WillOnce(testing::Return(true))
       .WillOnce(testing::Return(true))
@@ -163,11 +166,11 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterSaturatedTargetInteraction) {
   SequencerTarget callback =
       std::bind(&MockSequencerTarget::callback, &target, std::placeholders::_1);
   SequencerImpl sequencer(
-      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      platform_util_, *dispatcher_, time_source_, std::move(rate_limiter_), callback,
       std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
       test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 0ms /* Sequencer timeout. */);
 
-  EXPECT_CALL(getRateLimiter(), tryAcquireOne())
+  EXPECT_CALL(rate_limiter_unsafe_ref_, tryAcquireOne())
       .Times(testing::AtLeast(3))
       .WillOnce(testing::Return(true))
       .WillOnce(testing::Return(true))
@@ -179,7 +182,7 @@ TEST_F(SequencerTestWithTimerEmulation, RateLimiterSaturatedTargetInteraction) {
       .WillOnce(testing::Return(false));
 
   // The sequencer should call RateLimiter::releaseOne() when the target returns false.
-  EXPECT_CALL(getRateLimiter(), releaseOne()).Times(1);
+  EXPECT_CALL(rate_limiter_unsafe_ref_, releaseOne()).Times(1);
 
   sequencer.start();
   sequencer.waitForCompletion();
@@ -198,10 +201,12 @@ public:
     return true;
   }
   bool saturated_test(std::function<void()> /* f */) { return false; }
+
+  std::unique_ptr<LinearRateLimiter> rate_limiter_;
 };
 
 TEST_F(SequencerIntegrationTest, TheHappyFlow) {
-  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, *rate_limiter_,
+  SequencerImpl sequencer(platform_util_, *dispatcher_, time_source_, std::move(rate_limiter_),
                           sequencer_target_, std::make_unique<StreamingStatistic>(),
                           std::make_unique<StreamingStatistic>(),
                           test_number_of_intervals_ * interval_, 1s);
@@ -225,7 +230,7 @@ TEST_F(SequencerIntegrationTest, AlwaysSaturatedTargetTest) {
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::saturated_test, this, std::placeholders::_1);
   SequencerImpl sequencer(
-      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      platform_util_, *dispatcher_, time_source_, std::move(rate_limiter_), callback,
       std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
       test_number_of_intervals_ * interval_ /* Sequencer run time.*/, 1ms /* Sequencer timeout. */);
 
@@ -246,7 +251,7 @@ TEST_F(SequencerIntegrationTest, GraceTimeoutTest) {
   SequencerTarget callback =
       std::bind(&SequencerIntegrationTest::timeout_test, this, std::placeholders::_1);
   SequencerImpl sequencer(
-      platform_util_, *dispatcher_, time_source_, *rate_limiter_, callback,
+      platform_util_, *dispatcher_, time_source_, std::move(rate_limiter_), callback,
       std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
       test_number_of_intervals_ * interval_ /* Sequencer run time.*/, grace_timeout);
 

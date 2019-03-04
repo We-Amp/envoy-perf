@@ -88,8 +88,8 @@ public:
                               bool use_https, bool use_h2, uint64_t amount_of_request) {
 
     client_ = std::make_unique<Client::BenchmarkHttpClient>(
-        api_, *dispatcher_, std::make_unique<StreamingStatistic>(),
-        std::make_unique<StreamingStatistic>(),
+        api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
+        std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
         fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
         use_h2);
 
@@ -117,7 +117,6 @@ public:
     EXPECT_EQ(max_pending, inflight_response_count);
 
     dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
-
     EXPECT_EQ(0, client_->stream_reset_count());
   }
 

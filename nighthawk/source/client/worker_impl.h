@@ -12,6 +12,7 @@
 #include "nighthawk/client/option_interpreter.h"
 #include "nighthawk/client/options.h"
 #include "nighthawk/client/worker.h"
+#include "nighthawk/common/platform_util.h"
 #include "nighthawk/common/sequencer.h"
 #include "nighthawk/common/statistic.h"
 
@@ -20,7 +21,8 @@ namespace Client {
 
 class WorkerImpl : Worker {
 public:
-  WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls);
+  WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls,
+             Envoy::Stats::StorePtr&& store);
   ~WorkerImpl() override;
 
   void start() override;
@@ -30,7 +32,7 @@ protected:
   Envoy::Thread::ThreadFactory& thread_factory_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::ThreadLocal::Instance& tls_;
-  std::unique_ptr<Envoy::Stats::Store> store_;
+  Envoy::Stats::StorePtr store_;
   std::unique_ptr<Envoy::Runtime::Loader> runtime_;
   std::unique_ptr<Envoy::Runtime::RandomGenerator> generator_;
   Envoy::TimeSource& time_source_;
@@ -44,16 +46,20 @@ private:
 class WorkerClientImpl : public WorkerImpl, Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
 public:
   WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy::Api::Api& api,
-                   Envoy::ThreadLocal::Instance& tls, const Options& options, int worker_number,
-                   uint64_t start_delay_usec);
+                   Envoy::ThreadLocal::Instance& tls, Envoy::Stats::StorePtr&& store,
+                   const Options& options, int worker_number, uint64_t start_delay_usec);
 
   StatisticPtrVector statistics() const override;
 
 private:
   void work() override;
+  void simpleWarmup();
+  void delayStart();
+  void logResult();
 
   OptionInterpreter& option_interpreter_;
   const Options& options_;
+  PlatformUtilPtr platform_util_;
   std::unique_ptr<BenchmarkClient> benchmark_client_;
   std::unique_ptr<Sequencer> sequencer_;
   const int worker_number_;

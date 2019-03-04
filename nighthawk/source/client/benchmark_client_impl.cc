@@ -26,11 +26,11 @@ namespace Nighthawk {
 namespace Client {
 
 BenchmarkHttpClient::BenchmarkHttpClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
+                                         Envoy::Stats::StorePtr&& store,
                                          StatisticPtr&& connect_statistic,
                                          StatisticPtr&& response_statistic, const std::string& uri,
                                          bool use_h2)
-    : api_(api), dispatcher_(dispatcher),
-      store_(std::make_unique<Envoy::Stats::IsolatedStoreImpl>()),
+    : api_(api), dispatcher_(dispatcher), store_(std::move(store)),
       connect_statistic_(std::move(connect_statistic)),
       response_statistic_(std::move(response_statistic)), use_h2_(use_h2),
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),

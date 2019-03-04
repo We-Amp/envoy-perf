@@ -9,13 +9,14 @@
 #include "ares.h"
 #include <google/protobuf/util/json_util.h>
 
+#include "envoy/stats/store.h"
+
 #include "common/api/api_impl.h"
 #include "common/common/thread_impl.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/real_time_system.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/isolated_store_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "nighthawk/common/statistic.h"
@@ -85,15 +86,17 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
-  Envoy::Stats::IsolatedStoreImpl store;
+  OptionInterpreterImpl option_interpreter(*options_);
+
+  Envoy::Stats::StorePtr store = option_interpreter.createStatsStore();
   Envoy::Event::RealTimeSystem time_system;
-  Envoy::Api::Impl api(thread_factory, store, time_system);
+  Envoy::Api::Impl api(thread_factory, *store, time_system);
   Envoy::ThreadLocal::InstanceImpl tls;
   Envoy::Event::DispatcherPtr main_dispatcher(api.allocateDispatcher());
   // TODO(oschaaf): later on, fire up and use a main dispatcher loop as need arises.
   tls.registerThread(*main_dispatcher, true);
   Envoy::Runtime::RandomGeneratorImpl generator;
-  Envoy::Runtime::LoaderImpl runtime(generator, store, tls);
+  Envoy::Runtime::LoaderImpl runtime(generator, *store, tls);
 
   // We try to offset the start of each thread so that workers will execute tasks evenly
   // spaced in time.
@@ -103,11 +106,10 @@ bool Main::run() {
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<WorkerClientImplPtr> workers;
-  OptionInterpreterImpl option_interpreter(*options_);
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
-    workers.push_back(std::make_unique<WorkerClientImpl>(option_interpreter, api, tls, *options_,
-                                                         worker_number,
-                                                         inter_worker_delay_usec * worker_number));
+    workers.push_back(std::make_unique<WorkerClientImpl>(
+        option_interpreter, api, tls, option_interpreter.createStatsStore(), *options_,
+        worker_number, inter_worker_delay_usec * worker_number));
   }
 
   for (auto& w : workers) {
@@ -121,9 +123,9 @@ bool Main::run() {
   // Compute the merged statistics.
   std::vector<StatisticPtr> merged_statistics;
   StatisticPtrVector w0_statistics = workers[0]->statistics();
-  for (auto foo : w0_statistics) {
+  for (auto w0_statistic : w0_statistics) {
     auto new_statistic = option_interpreter.createStatistic();
-    new_statistic->setId(foo->id());
+    new_statistic->setId(w0_statistic->id());
     merged_statistics.push_back(std::move(new_statistic));
   }
 
