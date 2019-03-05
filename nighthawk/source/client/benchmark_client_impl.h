@@ -30,7 +30,6 @@ public:
   BenchmarkClientHttpImpl(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
                           Envoy::Stats::StorePtr&& store, StatisticPtr&& connect_statistic,
                           StatisticPtr&& response_statistic, const std::string& uri, bool use_h2);
-  ~BenchmarkClientHttpImpl() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
   uint64_t stream_reset_count() { return stream_reset_count_; }
@@ -43,8 +42,6 @@ public:
 
   // BenchmarkClient
   void initialize(Envoy::Runtime::Loader& runtime) override;
-
-  void terminate() override { resetPool(); };
 
   StatisticPtrMap statistics() const override;
 
@@ -70,13 +67,11 @@ public:
 
 private:
   void syncResolveDns();
-  void resetPool() { pool_.reset(); }
 
   Envoy::Api::Api& api_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::Stats::StorePtr store_;
   Envoy::Http::HeaderMapImpl request_headers_;
-  Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   StatisticPtr connect_statistic_;
   StatisticPtr response_statistic_;
   const bool use_h2_;
@@ -89,14 +84,17 @@ private:
   uint64_t connection_limit_;
   uint64_t max_pending_requests_;
   uint64_t pool_overflow_failures_;
-  Envoy::Http::ConnectionPool::InstancePtr pool_;
   Envoy::Event::TimerPtr timer_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
   uint64_t stream_reset_count_;
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool measure_latencies_;
-  Ssl::MinimalTransportSocketFactoryContext transport_socket_factory_context_;
+  std::unique_ptr<Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl>
+      ssl_context_manager_;
+  std::unique_ptr<Ssl::MinimalTransportSocketFactoryContext> transport_socket_factory_context_;
+  Envoy::Http::ConnectionPool::InstancePtr pool_;
+  Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
 };
 
 } // namespace Client

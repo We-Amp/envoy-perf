@@ -112,7 +112,6 @@ void WorkerClientImpl::work() {
   sequencer_->waitForCompletion();
   logResult();
 
-  benchmark_client_->terminate();
   dispatcher_->exit();
 }
 

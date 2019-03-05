@@ -38,9 +38,7 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      measure_latencies_(false),
-      transport_socket_factory_context_(api.timeSource(), store_->createScope("transport."),
-                                        dispatcher_, generator_, *store_, api) {
+      measure_latencies_(false), transport_socket_factory_context_(nullptr) {
   ASSERT(uri_->isValid());
 
   connect_statistic_->setId("benchmark_http_client.queue_to_connect");
@@ -89,6 +87,12 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   thresholds->mutable_max_connections()->set_value(connection_limit_);
   thresholds->mutable_max_pending_requests()->set_value(max_pending_requests_);
 
+  ssl_context_manager_.reset(
+      new Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl(api_.timeSource()));
+  transport_socket_factory_context_ = std::make_unique<Ssl::MinimalTransportSocketFactoryContext>(
+      store_->createScope("client."), dispatcher_, generator_, *store_, api_,
+      *ssl_context_manager_);
+
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
   if (uri_->scheme() == "https") {
@@ -97,8 +101,9 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
       common_tls_context->add_alpn_protocols("h2");
     }
     common_tls_context->add_alpn_protocols("http/1.1");
+
     socket_factory = Envoy::Upstream::createTransportSocketFactory(
-        cluster_config, transport_socket_factory_context_);
+        cluster_config, *transport_socket_factory_context_);
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };
@@ -155,14 +160,16 @@ bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completio
 
 std::string BenchmarkClientHttpImpl::countersToString(CounterFilter filter) const {
   auto counters = store_->counters();
-  std::string s;
+  std::vector<std::string> arr;
 
   for (auto stat : counters) {
     if (filter(stat->name(), stat->value())) {
-      s += fmt::format("{}:{}\n", stat->name(), stat->value());
+      arr.push_back(fmt::format("{}:{}", stat->name(), stat->value()));
     }
   }
-  return s;
+
+  std::sort(arr.begin(), arr.end());
+  return absl::StrJoin(arr, "\n");
 }
 
 void BenchmarkClientHttpImpl::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {

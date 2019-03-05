@@ -22,12 +22,12 @@ namespace Ssl {
 class MinimalTransportSocketFactoryContext
     : public Envoy::Server::Configuration::TransportSocketFactoryContext {
 public:
-  MinimalTransportSocketFactoryContext(Envoy::TimeSource& time_source,
-                                       Envoy::Stats::ScopePtr&& stats_scope,
-                                       Envoy::Event::Dispatcher& dispatcher,
-                                       Envoy::Runtime::RandomGenerator& random,
-                                       Envoy::Stats::Store& stats, Envoy::Api::Api& api)
-      : admin_(nullptr), time_source_(time_source), ssl_context_manager_(time_source_),
+  MinimalTransportSocketFactoryContext(
+      /*Envoy::TimeSource& time_source,*/ Envoy::Stats::ScopePtr&& stats_scope,
+      Envoy::Event::Dispatcher& dispatcher, Envoy::Runtime::RandomGenerator& random,
+      Envoy::Stats::Store& stats, Envoy::Api::Api& api,
+      Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl& ssl_context_manager)
+      : admin_(nullptr), /*time_source_(time_source),*/ ssl_context_manager_(ssl_context_manager),
         stats_scope_(std::move(stats_scope)), cluster_manager_(nullptr), local_info_(nullptr),
         dispatcher_(dispatcher), random_(random), stats_(stats), singleton_manager_(nullptr),
         thread_local_(nullptr), api_(api) {}
@@ -80,8 +80,8 @@ public:
 
 private:
   Envoy::Server::Admin* admin_;
-  Envoy::TimeSource& time_source_;
-  Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl ssl_context_manager_;
+  // Envoy::TimeSource& time_source_;
+  Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl& ssl_context_manager_;
   Envoy::Stats::ScopePtr stats_scope_;
   Envoy::Secret::SecretManagerImpl secret_manager_;
   Envoy::Upstream::ClusterManager* cluster_manager_;
