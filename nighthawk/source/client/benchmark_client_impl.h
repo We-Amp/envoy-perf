@@ -96,7 +96,8 @@ private:
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool measure_latencies_;
-}; // namespace Client
+  Ssl::MinimalTransportSocketFactoryContext transport_socket_factory_context_;
+};
 
 } // namespace Client
 } // namespace Nighthawk

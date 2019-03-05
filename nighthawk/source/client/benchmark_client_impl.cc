@@ -38,7 +38,9 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      measure_latencies_(false) {
+      measure_latencies_(false),
+      transport_socket_factory_context_(api.timeSource(), store_->createScope("transport."),
+                                        dispatcher_, generator_, *store_, api) {
   ASSERT(uri_->isValid());
 
   connect_statistic_->setId("benchmark_http_client.queue_to_connect");
@@ -80,9 +82,9 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   envoy::api::v2::Cluster cluster_config;
   envoy::api::v2::core::BindConfig bind_config;
 
-  cluster_config.mutable_connect_timeout()->set_seconds(timeout_.count());
   auto thresholds = cluster_config.mutable_circuit_breakers()->add_thresholds();
 
+  cluster_config.mutable_connect_timeout()->set_seconds(timeout_.count());
   thresholds->mutable_max_retries()->set_value(0);
   thresholds->mutable_max_connections()->set_value(connection_limit_);
   thresholds->mutable_max_pending_requests()->set_value(max_pending_requests_);
@@ -90,8 +92,13 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
   if (uri_->scheme() == "https") {
-    socket_factory = Envoy::Network::TransportSocketFactoryPtr{
-        new Ssl::MClientSslSocketFactory(*store_, api_.timeSource(), use_h2_)};
+    auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
+    if (use_h2_) {
+      common_tls_context->add_alpn_protocols("h2");
+    }
+    common_tls_context->add_alpn_protocols("http/1.1");
+    socket_factory = Envoy::Upstream::createTransportSocketFactory(
+        cluster_config, transport_socket_factory_context_);
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };
@@ -100,6 +107,9 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
       cluster_config, bind_config, runtime, std::move(socket_factory),
       store_->createScope("client."), false /*added_via_api*/);
 
+  Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
+      std::make_shared<Envoy::Network::ConnectionSocket::Options>();
+
   auto host = std::shared_ptr<Envoy::Upstream::Host>{new Envoy::Upstream::HostImpl(
       cluster_, uri_->host_and_port(), target_address_,
       envoy::api::v2::core::Metadata::default_instance(), 1 /* weight */,
@@ -107,8 +117,6 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
       envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
       envoy::api::v2::core::HealthStatus::HEALTHY)};
 
-  Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
-      std::make_shared<Envoy::Network::ConnectionSocket::Options>();
   if (use_h2_) {
     pool_ = std::make_unique<Envoy::Http::Http2::ProdConnPoolImpl>(
         dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
