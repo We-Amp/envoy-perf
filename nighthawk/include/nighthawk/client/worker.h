@@ -31,11 +31,11 @@ public:
   virtual void waitForCompletion() PURE;
 
   /**
-   * Gets the a vector of Statistic objects associated to the worker and its dependencies.
+   * Gets the statistics, keyed by id.
    *
-   * @return StatisticPtrVector A vector of Statistics.
+   * @return StatisticPtrMap A map of Statistics keyed by id.
    */
-  virtual StatisticPtrVector statistics() const PURE;
+  virtual StatisticPtrMap statistics() const PURE;
 
 protected:
   /**

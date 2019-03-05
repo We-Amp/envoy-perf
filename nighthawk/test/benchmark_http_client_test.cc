@@ -84,6 +84,7 @@ public:
     if (port == 0) {
       port = use_https ? getTestServerHostAndSslPort() : getTestServerHostAndPort();
     }
+
     client_ = std::make_unique<Client::BenchmarkClientHttpImpl>(
         api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
         std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
@@ -254,10 +255,9 @@ TEST_P(BenchmarkClientTest, EnableLatencyMeasurement) {
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(1, callback_count);
-  // TODO(oschaaf): consider exposing the queue/connect and request-response latency stats as
-  // members.
-  EXPECT_EQ(0, client_->statistics().front()->count());
-  EXPECT_EQ(0, client_->statistics().back()->count());
+
+  EXPECT_EQ(0, client_->statistics()["benchmark_http_client.queue_to_connect"]->count());
+  EXPECT_EQ(0, client_->statistics()["benchmark_http_client.request_to_response"]->count());
 
   client_->setMeasureLatencies(true);
   EXPECT_EQ(true, client_->measureLatencies());
@@ -270,11 +270,9 @@ TEST_P(BenchmarkClientTest, EnableLatencyMeasurement) {
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 
   EXPECT_EQ(2, callback_count);
-  EXPECT_EQ(1, client_->statistics().front()->count());
-  EXPECT_EQ(1, client_->statistics().back()->count());
 
-  // If this fails, we need maintenance.
-  EXPECT_EQ(2, client_->statistics().size());
+  EXPECT_EQ(1, client_->statistics()["benchmark_http_client.queue_to_connect"]->count());
+  EXPECT_EQ(1, client_->statistics()["benchmark_http_client.request_to_response"]->count());
 }
 
 } // namespace Nighthawk

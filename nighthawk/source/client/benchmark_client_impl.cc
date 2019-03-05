@@ -41,6 +41,9 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
       measure_latencies_(false) {
   ASSERT(uri_->isValid());
 
+  connect_statistic_->setId("benchmark_http_client.queue_to_connect");
+  response_statistic_->setId("benchmark_http_client.request_to_response");
+
   request_headers_.insertMethod().value(Envoy::Http::Headers::get().MethodValues.Get);
   request_headers_.insertPath().value(uri_->path());
   request_headers_.insertHost().value(uri_->host_and_port());
@@ -115,10 +118,10 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   }
 }
 
-StatisticPtrVector BenchmarkClientHttpImpl::statistics() const {
-  StatisticPtrVector statistics;
-  statistics.push_back(connect_statistic_.get());
-  statistics.push_back(response_statistic_.get());
+StatisticPtrMap BenchmarkClientHttpImpl::statistics() const {
+  StatisticPtrMap statistics;
+  statistics[connect_statistic_->id()] = connect_statistic_.get();
+  statistics[response_statistic_->id()] = response_statistic_.get();
   return statistics;
 };
 

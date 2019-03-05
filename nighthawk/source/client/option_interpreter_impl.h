@@ -12,7 +12,7 @@ public:
   createBenchmarkClient(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher) override;
 
   Envoy::Stats::StorePtr createStatsStore() override;
-  StatisticPtr createStatistic(std::string id = "") override;
+  StatisticPtr createStatistic() override;
   PlatformUtilPtr getPlatformUtil() override;
 
 private:

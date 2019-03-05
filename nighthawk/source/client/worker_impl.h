@@ -49,7 +49,7 @@ public:
                    Envoy::ThreadLocal::Instance& tls, Envoy::Stats::StorePtr&& store,
                    const Options& options, int worker_number, uint64_t start_delay_usec);
 
-  StatisticPtrVector statistics() const override;
+  StatisticPtrMap statistics() const override;
 
 private:
   void work() override;

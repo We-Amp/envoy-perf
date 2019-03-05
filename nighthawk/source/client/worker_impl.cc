@@ -53,11 +53,10 @@ WorkerClientImpl::WorkerClientImpl(OptionInterpreter& option_interpreter, Envoy:
   SequencerTarget sequencer_target =
       std::bind(&BenchmarkClient::tryStartOne, benchmark_client_.get(), std::placeholders::_1);
 
-  sequencer_.reset(new SequencerImpl(*platform_util_, *dispatcher_, time_source_,
-                                     std::move(rate_limiter), sequencer_target,
-                                     option_interpreter_.createStatistic("sequencer.callback"),
-                                     option_interpreter_.createStatistic("sequencer.blocking"),
-                                     options_.duration(), options_.timeout()));
+  sequencer_.reset(new SequencerImpl(
+      *platform_util_, *dispatcher_, time_source_, std::move(rate_limiter), sequencer_target,
+      option_interpreter_.createStatistic(), option_interpreter_.createStatistic(),
+      options_.duration(), options_.timeout()));
 }
 
 void WorkerClientImpl::logResult() {
@@ -65,11 +64,11 @@ void WorkerClientImpl::logResult() {
 
   for (auto statistic : benchmark_client_->statistics()) {
     worker_percentiles =
-        fmt::format(worker_percentiles, statistic->id(), statistic->toString() + "\n{}\n{}");
+        fmt::format(worker_percentiles, statistic.first, statistic.second->toString() + "\n{}\n{}");
   }
   for (auto statistic : sequencer_->statistics()) {
     worker_percentiles =
-        fmt::format(worker_percentiles, statistic->id(), statistic->toString() + "\n{}\n{}");
+        fmt::format(worker_percentiles, statistic.first, statistic.second->toString() + "\n{}\n{}");
   }
 
   worker_percentiles = fmt::format(worker_percentiles, "", "");
@@ -117,14 +116,11 @@ void WorkerClientImpl::work() {
   dispatcher_->exit();
 }
 
-StatisticPtrVector WorkerClientImpl::statistics() const {
-  StatisticPtrVector statistics;
+StatisticPtrMap WorkerClientImpl::statistics() const {
+  StatisticPtrMap statistics(benchmark_client_->statistics());
 
-  for (auto statistic : benchmark_client_->statistics()) {
-    statistics.push_back(statistic);
-  }
-  for (auto statistic : sequencer_->statistics()) {
-    statistics.push_back(statistic);
+  for (auto stat : sequencer_->statistics()) {
+    statistics[stat.first] = stat.second;
   }
 
   return statistics;

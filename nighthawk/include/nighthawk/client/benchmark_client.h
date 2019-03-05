@@ -34,11 +34,11 @@ public:
   virtual void setMeasureLatencies(bool measure_latencies) PURE;
 
   /**
-   * gets the statistics.
+   * Gets the statistics, keyed by id.
    *
-   * @return const std::vector<const Statistic&> A vector of Statistics.
+   * @return StatisticPtrMap A map of Statistics keyed by id.
    */
-  virtual StatisticPtrVector statistics() const PURE;
+  virtual StatisticPtrMap statistics() const PURE;
 
   // TODO(oschaaf): Consider where this belongs. E.g. "Sequenceable" ?
   // In this interface we would then have "bool startRequest()" or some such, which the sequenceable

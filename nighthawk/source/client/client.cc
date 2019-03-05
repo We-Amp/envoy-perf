@@ -122,18 +122,20 @@ bool Main::run() {
 
   // Compute the merged statistics.
   std::vector<StatisticPtr> merged_statistics;
-  StatisticPtrVector w0_statistics = workers[0]->statistics();
+  StatisticPtrMap w0_statistics = workers[0]->statistics();
   for (auto w0_statistic : w0_statistics) {
     auto new_statistic = option_interpreter.createStatistic();
-    new_statistic->setId(w0_statistic->id());
+    new_statistic->setId(w0_statistic.first);
     merged_statistics.push_back(std::move(new_statistic));
   }
 
   for (auto& w : workers) {
-    for (uint32_t i = 0; i < w->statistics().size(); i++) {
-      auto merged = merged_statistics[i]->combine(*(w->statistics()[i]));
+    uint32_t i = 0;
+    for (auto wx_statistic : w->statistics()) {
+      auto merged = merged_statistics[i]->combine(*(wx_statistic.second));
       merged->setId(merged_statistics[i]->id());
-      merged_statistics.at(i) = std::move(merged);
+      merged_statistics[i] = std::move(merged);
+      i++;
     }
   }
 

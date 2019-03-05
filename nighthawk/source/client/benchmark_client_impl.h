@@ -46,7 +46,7 @@ public:
 
   void terminate() override { resetPool(); };
 
-  StatisticPtrVector statistics() const override;
+  StatisticPtrMap statistics() const override;
 
   bool measureLatencies() const override { return measure_latencies_; }
 
