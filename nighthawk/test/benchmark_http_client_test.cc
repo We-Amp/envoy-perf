@@ -67,30 +67,27 @@ public:
     BaseIntegrationTest::initialize();
   }
 
-  std::string getTestServerHostAndPort() {
-    uint32_t port = lookupPort("listener_0");
-    return fmt::format("127.0.0.1:{}", port);
-  }
+  uint32_t getTestServerHostAndPort() { return lookupPort("listener_0"); }
 
-  std::string getTestServerHostAndSslPort() {
-    uint32_t port = lookupPort("listener_1");
-    return fmt::format("127.0.0.1:{}", port);
-  }
+  uint32_t getTestServerHostAndSslPort() { return lookupPort("listener_1"); }
 
   void TearDown() override {
     client_->terminate();
-    tls_.shutdownGlobalThreading();
-    ares_library_cleanup();
     test_server_.reset();
     fake_upstreams_.clear();
+    tls_.shutdownGlobalThreading();
+    ares_library_cleanup();
   }
 
-  void setupBenchmarkClient(const std::string uriPath, bool use_https, bool use_h2) {
+  void setupBenchmarkClient(const std::string uriPath, bool use_https, bool use_h2,
+                            uint32_t port = 0) {
+    if (port == 0) {
+      port = use_https ? getTestServerHostAndSslPort() : getTestServerHostAndPort();
+    }
     client_ = std::make_unique<Client::BenchmarkClientHttpImpl>(
         api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
         std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
-        fmt::format("{}://{}{}", use_https ? "https" : "http", getTestServerHostAndPort(), uriPath),
-        use_h2);
+        fmt::format("{}://127.0.0.1:{}{}", use_https ? "https" : "http", port, uriPath), use_h2);
   }
 
   void testBasicFunctionality(const std::string uriPath, uint64_t max_pending,
@@ -171,22 +168,35 @@ client.upstream_cx_tx_bytes_total:82\n",
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, false, 10);
-  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
-client.upstream_rq_total:1\n\
+  EXPECT_EQ("client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
+client.ssl.curves.X25519:1\n\
+client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n\
+client.upstream_cx_rx_bytes_total:3626\n\
 client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1\n\
+client.ssl.versions.TLSv1.2:1\n\
+client.ssl.handshake:1\n\
 client.upstream_cx_total:1\n\
-client.upstream_cx_rx_bytes_total:3625\n\
+client.upstream_cx_http1_total:1\n\
 client.upstream_cx_tx_bytes_total:82\n",
             getNonZeroValuedCounters());
 }
 
-// This test is disabled because of trouble with runtime initialization, causing it
-// to crash out. We change the alpn in a proto file which gets validated, which in
-// turn relies on a runtime which triggers 'assert failure: thread_local_data_.data_.size() >
-// index_.'
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) {
+TEST_P(BenchmarkClientTest, BasicTestH2) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, true, 10);
-  EXPECT_EQ("todo", getNonZeroValuedCounters());
+  // upstream_cx_rx_bytes_total fluctuates 1 byte between tests.
+  EXPECT_THAT(getNonZeroValuedCounters(),
+              ::testing::MatchesRegex("client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
+client.ssl.curves.X25519:1\n\
+client.upstream_cx_http2_total:1\n\
+client.ssl.handshake:1\n\
+client.upstream_rq_total:1\n\
+client.upstream_cx_rx_bytes_total:358[5-6]\n\
+client.upstream_cx_tx_bytes_total:109\n\
+client.ssl.versions.TLSv1.2:1\n\
+client.upstream_cx_total:1\n\
+client.upstream_rq_pending_total:1\n\
+client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n"));
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH2C) {

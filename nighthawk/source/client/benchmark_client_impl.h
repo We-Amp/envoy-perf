@@ -96,7 +96,6 @@ private:
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool measure_latencies_;
-  Ssl::MinimalTransportSocketFactoryContext transport_socket_factory_context_;
 }; // namespace Client
 
 } // namespace Client
