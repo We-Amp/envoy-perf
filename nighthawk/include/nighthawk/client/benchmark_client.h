@@ -22,11 +22,6 @@ public:
   virtual void initialize(Envoy::Runtime::Loader& runtime) PURE;
 
   /**
-   * Will be called before exitting the worker thread, after it is done using this BenchmarkClient.
-   */
-  virtual void terminate() PURE;
-
-  /**
    * Turns latency measurement on or off.
    *
    * @param measure_latencies true iff latencies should be measured.

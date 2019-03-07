@@ -147,14 +147,16 @@ bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completio
 
 std::string BenchmarkClientHttpImpl::countersToString(CounterFilter filter) const {
   auto counters = store_->counters();
-  std::string s;
+  std::vector<std::string> arr;
 
   for (auto stat : counters) {
     if (filter(stat->name(), stat->value())) {
-      s += fmt::format("{}:{}\n", stat->name(), stat->value());
+      arr.push_back(fmt::format("{}:{}", stat->name(), stat->value()));
     }
   }
-  return s;
+
+  std::sort(arr.begin(), arr.end());
+  return absl::StrJoin(arr, "\n");
 }
 
 void BenchmarkClientHttpImpl::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {

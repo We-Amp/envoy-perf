@@ -21,6 +21,7 @@
 #include "nighthawk/source/common/sequencer_impl.h"
 #include "nighthawk/source/common/statistic_impl.h"
 
+#include "envoy/thread_local/thread_local.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 
@@ -72,7 +73,6 @@ public:
   uint32_t getTestServerHostAndSslPort() { return lookupPort("listener_1"); }
 
   void TearDown() override {
-    client_->terminate();
     test_server_.reset();
     fake_upstreams_.clear();
     tls_.shutdownGlobalThreading();
@@ -134,7 +134,7 @@ public:
   Envoy::Api::Impl api_;
   Envoy::Event::DispatcherPtr dispatcher_;
   Envoy::Runtime::RandomGeneratorImpl generator_;
-  Envoy::ThreadLocal::InstanceImpl tls_;
+  ::testing::NiceMock<Envoy::ThreadLocal::MockInstance> tls_;
   ::testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   std::unique_ptr<Client::BenchmarkClientHttpImpl> client_;
 };
@@ -147,67 +147,68 @@ INSTANTIATE_TEST_CASE_P(IpVersions, BenchmarkClientTest,
 TEST_P(BenchmarkClientTest, BasicTestH1) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
-client.upstream_rq_total:1\n\
-client.upstream_rq_pending_total:1\n\
-client.upstream_cx_total:1\n\
 client.upstream_cx_rx_bytes_total:3625\n\
-client.upstream_cx_tx_bytes_total:82\n",
+client.upstream_cx_total:1\n\
+client.upstream_cx_tx_bytes_total:82\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH1404) {
   testBasicFunctionality("/lorem-ipsum-status-404", 1, 1, false, false, 10);
   EXPECT_EQ("client.upstream_cx_http1_total:1\n\
-client.upstream_rq_total:1\n\
-client.upstream_rq_pending_total:1\n\
 client.upstream_cx_protocol_error:1\n\
-client.upstream_cx_total:1\n\
 client.upstream_cx_rx_bytes_total:97\n\
-client.upstream_cx_tx_bytes_total:82\n",
+client.upstream_cx_total:1\n\
+client.upstream_cx_tx_bytes_total:82\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
 TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, false, 10);
-  EXPECT_EQ("client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
+  EXPECT_EQ("client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n\
 client.ssl.curves.X25519:1\n\
-client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n\
-client.upstream_cx_rx_bytes_total:3626\n\
-client.upstream_rq_pending_total:1\n\
-client.upstream_rq_total:1\n\
-client.ssl.versions.TLSv1.2:1\n\
 client.ssl.handshake:1\n\
-client.upstream_cx_total:1\n\
+client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
+client.ssl.versions.TLSv1.2:1\n\
 client.upstream_cx_http1_total:1\n\
-client.upstream_cx_tx_bytes_total:82\n",
+client.upstream_cx_rx_bytes_total:3626\n\
+client.upstream_cx_total:1\n\
+client.upstream_cx_tx_bytes_total:82\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH2) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, true, 10);
   // upstream_cx_rx_bytes_total fluctuates 1 byte between tests.
+
   EXPECT_THAT(getNonZeroValuedCounters(),
-              ::testing::MatchesRegex("client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
+              ::testing::MatchesRegex("client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n\
 client.ssl.curves.X25519:1\n\
-client.upstream_cx_http2_total:1\n\
 client.ssl.handshake:1\n\
-client.upstream_rq_total:1\n\
-client.upstream_cx_rx_bytes_total:358[5-6]\n\
-client.upstream_cx_tx_bytes_total:109\n\
+client.ssl.sigalgs.rsa_pss_rsae_sha256:1\n\
 client.ssl.versions.TLSv1.2:1\n\
+client.upstream_cx_http2_total:1\n\
+client.upstream_cx_rx_bytes_total:358[5-6]\n\
 client.upstream_cx_total:1\n\
+client.upstream_cx_tx_bytes_total:109\n\
 client.upstream_rq_pending_total:1\n\
-client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n"));
+client.upstream_rq_total:1"));
 }
 
 TEST_P(BenchmarkClientTest, BasicTestH2C) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, true, 10);
-  EXPECT_EQ("client.upstream_rq_total:1\n\
-client.upstream_rq_pending_total:1\n\
-client.upstream_cx_total:1\n\
+  EXPECT_EQ("client.upstream_cx_http2_total:1\n\
 client.upstream_cx_rx_bytes_total:3585\n\
-client.upstream_cx_http2_total:1\n\
-client.upstream_cx_tx_bytes_total:109\n",
+client.upstream_cx_total:1\n\
+client.upstream_cx_tx_bytes_total:109\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
@@ -216,12 +217,12 @@ TEST_P(BenchmarkClientTest, H1ConnectionFailure) {
   // We allow a single connection and no pending. We expect one connection failure.
   test_server_.reset();
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, false, false, 10);
-  EXPECT_EQ("client.upstream_cx_http1_total:1\n\
-client.upstream_rq_pending_failure_eject:1\n\
-client.upstream_rq_total:1\n\
-client.upstream_rq_pending_total:1\n\
+  EXPECT_EQ("client.upstream_cx_connect_fail:1\n\
+client.upstream_cx_http1_total:1\n\
 client.upstream_cx_total:1\n\
-client.upstream_cx_connect_fail:1\n",
+client.upstream_rq_pending_failure_eject:1\n\
+client.upstream_rq_pending_total:1\n\
+client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
@@ -230,12 +231,12 @@ TEST_P(BenchmarkClientTest, H1MultiConnectionFailure) {
   // We allow ten connections and ten pending requests. We expect ten connection failures.
   test_server_.reset();
   testBasicFunctionality("/lorem-ipsum-status-200", 10, 10, false, false, 10);
-  EXPECT_EQ("client.upstream_cx_http1_total:10\n\
-client.upstream_rq_pending_failure_eject:10\n\
-client.upstream_rq_total:10\n\
-client.upstream_rq_pending_total:10\n\
+  EXPECT_EQ("client.upstream_cx_connect_fail:10\n\
+client.upstream_cx_http1_total:10\n\
 client.upstream_cx_total:10\n\
-client.upstream_cx_connect_fail:10\n",
+client.upstream_rq_pending_failure_eject:10\n\
+client.upstream_rq_pending_total:10\n\
+client.upstream_rq_total:10",
             getNonZeroValuedCounters());
 }
 

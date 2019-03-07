@@ -30,7 +30,6 @@ public:
   BenchmarkClientHttpImpl(Envoy::Api::Api& api, Envoy::Event::Dispatcher& dispatcher,
                           Envoy::Stats::StorePtr&& store, StatisticPtr&& connect_statistic,
                           StatisticPtr&& response_statistic, const std::string& uri, bool use_h2);
-  ~BenchmarkClientHttpImpl() override = default;
 
   // TODO(oschaaf): can probably get rid of these.
   uint64_t stream_reset_count() { return stream_reset_count_; }
@@ -43,8 +42,6 @@ public:
 
   // BenchmarkClient
   void initialize(Envoy::Runtime::Loader& runtime) override;
-
-  void terminate() override { resetPool(); };
 
   StatisticPtrMap statistics() const override;
 
@@ -70,7 +67,6 @@ public:
 
 private:
   void syncResolveDns();
-  void resetPool() { pool_.reset(); }
 
   Envoy::Api::Api& api_;
   Envoy::Event::Dispatcher& dispatcher_;
