@@ -21,11 +21,11 @@
 
 #include "nighthawk/common/statistic.h"
 
+#include "nighthawk/source/client/client_worker_impl.h"
 #include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/client/options_impl.h"
 #include "nighthawk/source/client/output.pb.h"
 #include "nighthawk/source/client/output_formatter_impl.h"
-#include "nighthawk/source/client/worker_impl.h"
 #include "nighthawk/source/common/frequency.h"
 #include "nighthawk/source/common/utility.h"
 
@@ -105,11 +105,11 @@ bool Main::run() {
   double inter_worker_delay_usec = (1. / options_->requests_per_second()) * 1000000 / concurrency;
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
-  std::vector<WorkerClientImplPtr> workers;
+  std::vector<ClientWorkerPtr> workers;
   for (uint32_t worker_number = 0; worker_number < concurrency; worker_number++) {
-    workers.push_back(std::make_unique<WorkerClientImpl>(
-        option_interpreter, api, tls, option_interpreter.createStatsStore(), *options_,
-        worker_number, inter_worker_delay_usec * worker_number));
+    workers.push_back(std::make_unique<ClientWorkerImpl>(
+        option_interpreter, api, tls, option_interpreter.createStatsStore(), worker_number,
+        inter_worker_delay_usec * worker_number));
   }
 
   for (auto& w : workers) {

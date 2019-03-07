@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "envoy/runtime/runtime.h"
 
@@ -50,13 +51,6 @@ public:
   virtual bool tryStartOne(std::function<void()> caller_completion_callback) PURE;
 
   /**
-   * Gets the value of a counter by name.
-   * @param counter The name of the counter
-   * @return uint64_t The value of the counter.
-   */
-  virtual uint64_t getCounter(const std::string& counter) const PURE;
-
-  /**
    * Transforms statistics matching the filter argument into a string of statistic "name:value"
    * pairs, one per line.
    * @param filter function that returns true iff a statistic should be transformed, based on the
@@ -74,6 +68,8 @@ protected:
    */
   virtual bool measureLatencies() const PURE;
 };
+
+typedef std::unique_ptr<BenchmarkClient> BenchmarkClientPtr;
 
 } // namespace Client
 } // namespace Nighthawk

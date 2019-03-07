@@ -4,6 +4,8 @@
 
 #include "nighthawk/source/client/benchmark_client_impl.h"
 #include "nighthawk/source/common/platform_util_impl.h"
+#include "nighthawk/source/common/rate_limiter_impl.h"
+#include "nighthawk/source/common/sequencer_impl.h"
 #include "nighthawk/source/common/statistic_impl.h"
 
 namespace Nighthawk {
@@ -11,7 +13,7 @@ namespace Client {
 
 OptionInterpreterImpl::OptionInterpreterImpl(const Options& options) : options_(options) {}
 
-std::unique_ptr<BenchmarkClient>
+BenchmarkClientPtr
 OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
                                              Envoy::Event::Dispatcher& dispatcher) {
   auto benchmark_client = std::make_unique<BenchmarkClientHttpImpl>(
@@ -21,6 +23,20 @@ OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
   benchmark_client->set_connection_limit(options_.connections());
   return benchmark_client;
 };
+
+SequencerPtr OptionInterpreterImpl::createSequencer(Envoy::TimeSource& time_source,
+                                                    Envoy::Event::Dispatcher& dispatcher,
+                                                    BenchmarkClient& benchmark_client) {
+  RateLimiterPtr rate_limiter =
+      std::make_unique<LinearRateLimiter>(time_source, Frequency(options_.requests_per_second()));
+  SequencerTarget sequencer_target =
+      std::bind(&BenchmarkClient::tryStartOne, &benchmark_client, std::placeholders::_1);
+
+  SequencerPtr sequencer = std::make_unique<SequencerImpl>(
+      platform_util_, dispatcher, time_source, std::move(rate_limiter), sequencer_target,
+      createStatistic(), createStatistic(), options_.duration(), options_.timeout());
+  return sequencer;
+}
 
 Envoy::Stats::StorePtr OptionInterpreterImpl::createStatsStore() {
   return std::make_unique<Envoy::Stats::IsolatedStoreImpl>();

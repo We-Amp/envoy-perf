@@ -53,10 +53,6 @@ public:
 
   bool tryStartOne(std::function<void()> caller_completion_callback) override;
 
-  uint64_t getCounter(const std::string& counter) const override {
-    return store_->counter(counter).value();
-  }
-
   std::string countersToString(CounterFilter filter = [](std::string, uint64_t) {
     return true;
   }) const override;
