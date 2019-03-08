@@ -24,6 +24,7 @@ envoy_cc_test(
         "benchmark_http_client_test.cc",
         "client_worker_test.cc",
         "frequency_test.cc",
+        "option_interpreter_test.cc",
         "options_test.cc",
         "platform_util_test.cc",
         "rate_limiter_test.cc",

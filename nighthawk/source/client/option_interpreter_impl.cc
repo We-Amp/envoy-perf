@@ -42,10 +42,7 @@ Envoy::Stats::StorePtr OptionInterpreterImpl::createStatsStore() {
   return std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
 }
 
-StatisticPtr OptionInterpreterImpl::createStatistic() {
-  auto statistic = std::make_unique<HdrStatistic>();
-  return statistic;
-}
+StatisticPtr OptionInterpreterImpl::createStatistic() { return std::make_unique<HdrStatistic>(); }
 
 PlatformUtilPtr OptionInterpreterImpl::getPlatformUtil() {
   // TODO(oschaaf): singleton?
