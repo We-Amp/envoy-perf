@@ -73,6 +73,7 @@ void ClientWorkerImpl::work() {
 StatisticPtrMap ClientWorkerImpl::statistics() const {
   StatisticPtrMap statistics(benchmark_client_->statistics());
 
+  // TODO(oschaaf): should check for duplicate id's and except.
   for (auto stat : sequencer_->statistics()) {
     statistics[stat.first] = stat.second;
   }
