@@ -76,7 +76,7 @@ TEST_F(ClientWorkerTest, BasicTest) {
 
     // warmup
     EXPECT_CALL(*benchmark_client_, tryStartOne(_))
-        .Times(5)
+        .Times(1)
         .WillRepeatedly(Invoke(this, &ClientWorkerTest::CheckTreadChanged));
 
     // latency measurement will be initiated
