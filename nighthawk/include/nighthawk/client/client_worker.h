@@ -17,7 +17,6 @@ class ClientWorker : virtual public Worker {
 public:
   /**
    * Gets the statistics, keyed by id.
-   *
    * @return StatisticPtrMap A map of Statistics keyed by id.
    */
   virtual StatisticPtrMap statistics() const PURE;

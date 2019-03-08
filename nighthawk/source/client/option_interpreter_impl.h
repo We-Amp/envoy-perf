@@ -21,7 +21,7 @@ public:
 
   Envoy::Stats::StorePtr createStatsStore() override;
   StatisticPtr createStatistic() override;
-  // todo: revisit, keep one instance here?
+  // TODO(oschaaf): revisit, do we want a singleton here?
   PlatformUtilPtr getPlatformUtil() override;
 
 private:

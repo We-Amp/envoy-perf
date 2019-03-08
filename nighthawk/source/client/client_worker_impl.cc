@@ -35,11 +35,7 @@ void ClientWorkerImpl::logResult() {
 
 void ClientWorkerImpl::simpleWarmup() {
   ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
-
-  for (int i = 0; i < 5; i++) {
-    benchmark_client_->tryStartOne([this] { dispatcher_->exit(); });
-  }
-
+  benchmark_client_->tryStartOne([this] { dispatcher_->exit(); });
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 }
 
