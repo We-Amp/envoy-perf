@@ -16,6 +16,7 @@
 #include "common/network/raw_buffer_socket.h"
 #include "common/network/utility.h"
 #include "common/upstream/cluster_manager_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "nighthawk/common/statistic.h"
 
@@ -38,7 +39,7 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      measure_latencies_(false) {
+      measure_latencies_(false), transport_socket_factory_context_(nullptr) {
   ASSERT(uri_->isValid());
 
   connect_statistic_->setId("benchmark_http_client.queue_to_connect");
@@ -90,8 +91,28 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
   if (uri_->scheme() == "https") {
-    socket_factory = Envoy::Network::TransportSocketFactoryPtr{
-        new Ssl::MClientSslSocketFactory(*store_, api_.timeSource(), use_h2_)};
+    auto common_tls_context = cluster_config.mutable_tls_context()->mutable_common_tls_context();
+    if (use_h2_) {
+      common_tls_context->add_alpn_protocols("h2");
+    }
+    common_tls_context->add_alpn_protocols("http/1.1");
+
+    // TODO(oschaaf): we must translate the any cluster config which has a tls context ourselves.
+    // Do that & use below, and re-enable the two tests that trigger the assert that happens on
+    // the deprecation check.
+    /*
+        auto client_config =
+            std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+                dynamic_cast<const envoy::api::v2::auth::UpstreamTlsContext&>(cluster_config),
+                *transport_socket_factory_context_);
+
+        socket_factory =
+            std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+                std::move(client_config), transport_socket_factory_context_->sslContextManager(),
+                transport_socket_factory_context_->statsScope());
+        */
+    socket_factory = Envoy::Upstream::createTransportSocketFactory(
+        cluster_config, *transport_socket_factory_context_);
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };

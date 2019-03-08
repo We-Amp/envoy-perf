@@ -12,8 +12,8 @@ WorkerImpl::WorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Instance& tls,
     : thread_factory_(api.threadFactory()), dispatcher_(api.allocateDispatcher()), tls_(tls),
       store_(std::move(store)), generator_(std::make_unique<Envoy::Runtime::RandomGeneratorImpl>()),
       time_source_(api.timeSource()), started_(false), completed_(false) {
-  tls_.registerThread(*dispatcher_, false);
-  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(*generator_, *store_, tls_);
+  tls.registerThread(*dispatcher_, false);
+  runtime_ = std::make_unique<Envoy::Runtime::LoaderImpl>(*generator_, *store_, tls);
 }
 
 WorkerImpl::~WorkerImpl() { tls_.shutdownThread(); }
