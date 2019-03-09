@@ -23,19 +23,13 @@ class MinimalTransportSocketFactoryContext
     : public Envoy::Server::Configuration::TransportSocketFactoryContext {
 public:
   MinimalTransportSocketFactoryContext(
-      /*Envoy::TimeSource& time_source,*/ Envoy::Stats::ScopePtr&& stats_scope,
-      Envoy::Event::Dispatcher& dispatcher, Envoy::Runtime::RandomGenerator& random,
-      Envoy::Stats::Store& stats, Envoy::Api::Api& api,
+      Envoy::Stats::ScopePtr&& stats_scope, Envoy::Event::Dispatcher& dispatcher,
+      Envoy::Runtime::RandomGenerator& random, Envoy::Stats::Store& stats, Envoy::Api::Api& api,
       Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl& ssl_context_manager)
-      : admin_(nullptr), /*time_source_(time_source),*/ ssl_context_manager_(ssl_context_manager),
-        stats_scope_(std::move(stats_scope)), cluster_manager_(nullptr), local_info_(nullptr),
-        dispatcher_(dispatcher), random_(random), stats_(stats), singleton_manager_(nullptr),
-        thread_local_(nullptr), api_(api) {}
+      : ssl_context_manager_(ssl_context_manager), stats_scope_(std::move(stats_scope)),
+        dispatcher_(dispatcher), random_(random), stats_(stats), api_(api) {}
 
-  Envoy::Server::Admin& admin() override {
-    ASSERT(false);
-    return *admin_;
-  }
+  Envoy::Server::Admin& admin() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Envoy::Ssl::ContextManager& sslContextManager() override { return ssl_context_manager_; }
 
@@ -43,15 +37,9 @@ public:
 
   Envoy::Secret::SecretManager& secretManager() override { return secret_manager_; }
 
-  Envoy::Upstream::ClusterManager& clusterManager() override {
-    ASSERT(false);
-    return *cluster_manager_;
-  }
+  Envoy::Upstream::ClusterManager& clusterManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  const Envoy::LocalInfo::LocalInfo& localInfo() override {
-    ASSERT(false);
-    return *local_info_;
-  }
+  const Envoy::LocalInfo::LocalInfo& localInfo() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Envoy::Event::Dispatcher& dispatcher() override { return dispatcher_; }
 
@@ -59,39 +47,23 @@ public:
 
   Envoy::Stats::Store& stats() override { return stats_; }
 
-  void setInitManager(Envoy::Init::Manager&) override { ASSERT(false); }
+  void setInitManager(Envoy::Init::Manager&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  Envoy::Init::Manager* initManager() override {
-    ASSERT(false);
-    return init_manager_;
-  }
+  Envoy::Init::Manager* initManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  Envoy::Singleton::Manager& singletonManager() override {
-    ASSERT(false);
-    return *singleton_manager_;
-  }
+  Envoy::Singleton::Manager& singletonManager() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  Envoy::ThreadLocal::SlotAllocator& threadLocal() override {
-    ASSERT(false);
-    return *thread_local_;
-  }
+  Envoy::ThreadLocal::SlotAllocator& threadLocal() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   Envoy::Api::Api& api() override { return api_; }
 
 private:
-  Envoy::Server::Admin* admin_;
-  // Envoy::TimeSource& time_source_;
   Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl& ssl_context_manager_;
   Envoy::Stats::ScopePtr stats_scope_;
   Envoy::Secret::SecretManagerImpl secret_manager_;
-  Envoy::Upstream::ClusterManager* cluster_manager_;
-  const Envoy::LocalInfo::LocalInfo* local_info_;
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::Runtime::RandomGenerator& random_;
   Envoy::Stats::Store& stats_;
-  Envoy::Init::Manager* init_manager_;
-  Envoy::Singleton::Manager* singleton_manager_;
-  Envoy::ThreadLocal::SlotAllocator* thread_local_;
   Envoy::Api::Api& api_;
 };
 

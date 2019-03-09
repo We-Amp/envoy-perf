@@ -51,17 +51,17 @@ void ClientWorkerImpl::delayStart() {
 }
 
 void ClientWorkerImpl::work() {
-  benchmark_client_->initialize(*runtime_);
+  if (benchmark_client_->initialize(*runtime_)) {
+    simpleWarmup();
 
-  simpleWarmup();
+    benchmark_client_->setMeasureLatencies(true);
 
-  benchmark_client_->setMeasureLatencies(true);
+    delayStart();
 
-  delayStart();
-
-  sequencer_->start();
-  sequencer_->waitForCompletion();
-  logResult();
+    sequencer_->start();
+    sequencer_->waitForCompletion();
+    logResult();
+  }
 
   dispatcher_->exit();
 }

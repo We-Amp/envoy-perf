@@ -99,7 +99,7 @@ public:
     client_->set_connection_timeout(10s);
     client_->set_max_pending_requests(max_pending);
     client_->set_connection_limit(connection_limit);
-    client_->initialize(runtime_);
+    EXPECT_TRUE(client_->initialize(runtime_));
 
     uint64_t amount = amount_of_request;
     uint64_t inflight_response_count = 0;
@@ -242,7 +242,7 @@ client.upstream_rq_total:10",
 
 TEST_P(BenchmarkClientTest, EnableLatencyMeasurement) {
   setupBenchmarkClient("/", false, false);
-  client_->initialize(runtime_);
+  EXPECT_TRUE(client_->initialize(runtime_));
 
   EXPECT_EQ(false, client_->measureLatencies());
 
@@ -274,6 +274,16 @@ TEST_P(BenchmarkClientTest, EnableLatencyMeasurement) {
 
   EXPECT_EQ(1, client_->statistics()["benchmark_http_client.queue_to_connect"]->count());
   EXPECT_EQ(1, client_->statistics()["benchmark_http_client.request_to_response"]->count());
+}
+
+TEST_P(BenchmarkClientTest, UnresolveableHostname) {
+  client_ = std::make_unique<Client::BenchmarkClientHttpImpl>(
+      api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
+      std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
+      fmt::format("{}://unresolveablefoobarhost:{}{}", "http", getTestServerHostAndPort(), "/"),
+      false);
+
+  EXPECT_FALSE(client_->initialize(runtime_));
 }
 
 } // namespace Nighthawk

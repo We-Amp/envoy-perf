@@ -38,10 +38,9 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
     : api_(api), dispatcher_(dispatcher), store_(std::move(store)),
       connect_statistic_(std::move(connect_statistic)),
       response_statistic_(std::move(response_statistic)), use_h2_(use_h2),
-      uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
-      connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
-      stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      measure_latencies_(false) {
+      uri_(std::make_unique<Uri>(Uri::Parse(uri))), timeout_(5s), connection_limit_(1),
+      max_pending_requests_(1), pool_overflow_failures_(0), stream_reset_count_(0),
+      requests_completed_(0), requests_initiated_(0), measure_latencies_(false) {
   ASSERT(uri_->isValid());
 
   connect_statistic_->setId("benchmark_http_client.queue_to_connect");
@@ -55,19 +54,20 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
                                             : Envoy::Http::Headers::get().SchemeValues.Http);
 }
 
-void BenchmarkClientHttpImpl::syncResolveDns() {
+bool BenchmarkClientHttpImpl::syncResolveDns() {
+  bool dns_resolved = false;
   auto dns_resolver = dispatcher_.createDnsResolver({});
   Envoy::Network::ActiveDnsQuery* active_dns_query_ = dns_resolver->resolve(
       uri_->host_without_port(), Envoy::Network::DnsLookupFamily::V4Only,
-      [this, &active_dns_query_](
+      [this, &dns_resolved, &active_dns_query_](
           const std::list<Envoy::Network::Address::InstanceConstSharedPtr>&& address_list) -> void {
         active_dns_query_ = nullptr;
         ENVOY_LOG(debug, "DNS resolution complete for {} ({} entries).", uri_->host_without_port(),
                   address_list.size());
         if (!address_list.empty()) {
-          dns_failure_ = false;
           target_address_ =
               Envoy::Network::Utility::getAddressWithPort(*address_list.front(), uri_->port());
+          dns_resolved = true;
         } else {
           ENVOY_LOG(critical, "Could not resolve host [{}]", uri_->host_without_port());
         }
@@ -75,10 +75,13 @@ void BenchmarkClientHttpImpl::syncResolveDns() {
       });
   // Wait for DNS resolution to complete before proceeding.
   dispatcher_.run(Envoy::Event::Dispatcher::RunType::Block);
+  return dns_resolved;
 }
 
-void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
-  syncResolveDns();
+bool BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
+  if (!syncResolveDns()) {
+    return false;
+  }
 
   envoy::api::v2::Cluster cluster_config;
   envoy::api::v2::core::BindConfig bind_config;
@@ -161,6 +164,7 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
     pool_ = std::make_unique<Envoy::Http::Http1::ProdConnPoolImpl>(
         dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
   }
+  return true;
 }
 
 StatisticPtrMap BenchmarkClientHttpImpl::statistics() const {
@@ -171,6 +175,7 @@ StatisticPtrMap BenchmarkClientHttpImpl::statistics() const {
 };
 
 bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completion_callback) {
+  ASSERT(target_address_.get());
   if (!cluster_->resourceManager(Envoy::Upstream::ResourcePriority::Default)
            .pendingRequests()
            .canCreate() ||

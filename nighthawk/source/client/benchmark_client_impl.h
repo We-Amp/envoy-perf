@@ -43,7 +43,7 @@ public:
   }
 
   // BenchmarkClient
-  void initialize(Envoy::Runtime::Loader& runtime) override;
+  bool initialize(Envoy::Runtime::Loader& runtime) override;
 
   StatisticPtrMap statistics() const override;
 
@@ -64,7 +64,7 @@ public:
   void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) override;
 
 private:
-  void syncResolveDns();
+  bool syncResolveDns();
 
   Envoy::Api::Api& api_;
   Envoy::Event::Dispatcher& dispatcher_;
@@ -81,9 +81,6 @@ private:
   StatisticPtr response_statistic_;
   const bool use_h2_;
   const std::unique_ptr<Uri> uri_;
-  // dns_failure_ will be set by syncResolveDns. If false, the benchmark client should be disposed,
-  // as it isn't further usable.
-  bool dns_failure_;
   Envoy::Network::Address::InstanceConstSharedPtr target_address_;
   std::chrono::seconds timeout_;
   uint64_t connection_limit_;

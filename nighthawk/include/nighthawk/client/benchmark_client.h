@@ -20,7 +20,7 @@ public:
    * Initialize will be called on the worker thread after it has started.
    * @param runtime to be used during initialization.
    */
-  virtual void initialize(Envoy::Runtime::Loader& runtime) PURE;
+  virtual bool initialize(Envoy::Runtime::Loader& runtime) PURE;
 
   /**
    * Turns latency measurement on or off.
