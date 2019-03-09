@@ -1,7 +1,7 @@
 
 #pragma once
 
-// TODO(oschaaf): certificate validation, set up alpn for h/2.
+// TODO(oschaaf): certificate validation.
 
 #include "server/transport_socket_config_impl.h"
 

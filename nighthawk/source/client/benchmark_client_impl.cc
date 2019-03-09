@@ -105,15 +105,11 @@ bool BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
     //
     auto transport_socket = cluster_config.transport_socket();
     if (!cluster_config.has_transport_socket()) {
-      if (cluster_config.has_tls_context()) {
-        transport_socket.set_name(
-            Envoy::Extensions::TransportSockets::TransportSocketNames::get().Tls);
-        Envoy::MessageUtil::jsonConvert(cluster_config.tls_context(),
-                                        *transport_socket.mutable_config());
-      } else {
-        transport_socket.set_name(
-            Envoy::Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
-      }
+      ASSERT(cluster_config.has_tls_context());
+      transport_socket.set_name(
+          Envoy::Extensions::TransportSockets::TransportSocketNames::get().Tls);
+      Envoy::MessageUtil::jsonConvert(cluster_config.tls_context(),
+                                      *transport_socket.mutable_config());
     }
 
     auto& config_factory = Envoy::Config::Utility::getAndCheckFactory<
@@ -228,8 +224,7 @@ void BenchmarkClientHttpImpl::onPoolFailure(Envoy::Http::ConnectionPool::PoolFai
   case Envoy::Http::ConnectionPool::PoolFailureReason::ConnectionFailure:
     break;
   case Envoy::Http::ConnectionPool::PoolFailureReason::Overflow:
-    // We do not expect this to happen, at least not right now.
-    ASSERT(false);
+    NOT_REACHED_GCOVR_EXCL_LINE;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
