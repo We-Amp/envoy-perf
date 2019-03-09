@@ -7,6 +7,8 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/thread_local/thread_local.h"
 
+#include "extensions/transport_sockets/well_known_names.h"
+
 #include "common/common/compiler_requirements.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -39,7 +41,7 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
       uri_(std::make_unique<Uri>(Uri::Parse(uri))), dns_failure_(true), timeout_(5s),
       connection_limit_(1), max_pending_requests_(1), pool_overflow_failures_(0),
       stream_reset_count_(0), requests_completed_(0), requests_initiated_(0),
-      measure_latencies_(false), transport_socket_factory_context_(nullptr) {
+      measure_latencies_(false) {
   ASSERT(uri_->isValid());
 
   connect_statistic_->setId("benchmark_http_client.queue_to_connect");
@@ -97,22 +99,44 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
     }
     common_tls_context->add_alpn_protocols("http/1.1");
 
-    // TODO(oschaaf): we must translate the any cluster config which has a tls context ourselves.
-    // Do that & use below, and re-enable the two tests that trigger the assert that happens on
-    // the deprecation check.
-    /*
-        auto client_config =
-            std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
-                dynamic_cast<const envoy::api::v2::auth::UpstreamTlsContext&>(cluster_config),
-                *transport_socket_factory_context_);
+    //
+    auto transport_socket = cluster_config.transport_socket();
+    if (!cluster_config.has_transport_socket()) {
+      if (cluster_config.has_tls_context()) {
+        transport_socket.set_name(
+            Envoy::Extensions::TransportSockets::TransportSocketNames::get().Tls);
+        Envoy::MessageUtil::jsonConvert(cluster_config.tls_context(),
+                                        *transport_socket.mutable_config());
+      } else {
+        transport_socket.set_name(
+            Envoy::Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
+      }
+    }
 
-        socket_factory =
-            std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
-                std::move(client_config), transport_socket_factory_context_->sslContextManager(),
-                transport_socket_factory_context_->statsScope());
-        */
-    socket_factory = Envoy::Upstream::createTransportSocketFactory(
-        cluster_config, *transport_socket_factory_context_);
+    auto& config_factory = Envoy::Config::Utility::getAndCheckFactory<
+        Envoy::Server::Configuration::UpstreamTransportSocketConfigFactory>(
+        transport_socket.name());
+    Envoy::ProtobufTypes::MessagePtr message =
+        Envoy::Config::Utility::translateToFactoryConfig(transport_socket, config_factory);
+
+    ssl_context_manager_.reset(
+        new Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl(api_.timeSource()));
+    transport_socket_factory_context_ = std::make_unique<Ssl::MinimalTransportSocketFactoryContext>(
+        store_->createScope("client."), dispatcher_, generator_, *store_, api_,
+        *ssl_context_manager_);
+
+    // TODO(oschaaf): We perform some bootstrapping ourselves here, to avoid an assert during the
+    // integration test because of a runtime/tls conflict when the message gets validated. Ideally
+    // we'd just re-use Tls::Upstream::createTransforFactory()
+
+    auto client_config =
+        std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+            dynamic_cast<const envoy::api::v2::auth::UpstreamTlsContext&>(*message),
+            *transport_socket_factory_context_);
+    socket_factory =
+        std::make_unique<Envoy::Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+            std::move(client_config), transport_socket_factory_context_->sslContextManager(),
+            transport_socket_factory_context_->statsScope());
   } else {
     socket_factory = std::make_unique<Envoy::Network::RawBufferSocketFactory>();
   };

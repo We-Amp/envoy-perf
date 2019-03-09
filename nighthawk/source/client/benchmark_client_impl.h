@@ -70,6 +70,12 @@ private:
   Envoy::Event::Dispatcher& dispatcher_;
   Envoy::Stats::StorePtr store_;
   Envoy::Http::HeaderMapImpl request_headers_;
+  // These are declared order dependent. Changing orderering may trigger on assert upon
+  // destruction when tls has been involved during usage.
+  std::unique_ptr<Envoy::Server::Configuration::TransportSocketFactoryContext>
+      transport_socket_factory_context_;
+  std::unique_ptr<Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl>
+      ssl_context_manager_;
   Envoy::Upstream::ClusterInfoConstSharedPtr cluster_;
   StatisticPtr connect_statistic_;
   StatisticPtr response_statistic_;
@@ -90,11 +96,6 @@ private:
   uint64_t requests_completed_;
   uint64_t requests_initiated_;
   bool measure_latencies_;
-  std::unique_ptr<Envoy::Extensions::TransportSockets::Tls::ContextManagerImpl>
-      ssl_context_manager_;
-  std::unique_ptr<Envoy::Server::Configuration::TransportSocketFactoryContext>
-      transport_socket_factory_context_;
-
 }; // namespace Client
 
 } // namespace Client

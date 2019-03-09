@@ -167,7 +167,7 @@ client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestHttpsH1) {
+TEST_P(BenchmarkClientTest, BasicTestHttpsH1) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, false, 10);
   EXPECT_EQ("client.ssl.ciphers.ECDHE-RSA-AES128-GCM-SHA256:1\n\
 client.ssl.curves.X25519:1\n\
@@ -183,7 +183,7 @@ client.upstream_rq_total:1",
             getNonZeroValuedCounters());
 }
 
-TEST_P(BenchmarkClientTest, DISABLED_BasicTestH2) {
+TEST_P(BenchmarkClientTest, BasicTestH2) {
   testBasicFunctionality("/lorem-ipsum-status-200", 1, 1, true, true, 10);
   // upstream_cx_rx_bytes_total fluctuates 1 byte between tests.
 
