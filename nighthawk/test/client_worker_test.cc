@@ -64,7 +64,7 @@ TEST_F(ClientWorkerTest, BasicTest) {
   {
     testing::InSequence dummy;
 
-    EXPECT_CALL(*benchmark_client_, initialize).Times(1);
+    EXPECT_CALL(*benchmark_client_, initialize).Times(1).WillOnce(testing::Return(true));
 
     EXPECT_CALL(*sequencer_, start).Times(1);
 
