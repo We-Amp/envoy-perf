@@ -40,16 +40,18 @@ public:
   bool complete() { return complete_; }
 
   // Http::StreamDecoder
-  void decode100ContinueHeaders(Envoy::Http::HeaderMapPtr&&) override {}
+  void decode100ContinueHeaders(Envoy::Http::HeaderMapPtr&&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void decodeHeaders(Envoy::Http::HeaderMapPtr&& headers, bool end_stream) override;
   void decodeData(Envoy::Buffer::Instance&, bool end_stream) override;
   void decodeTrailers(Envoy::Http::HeaderMapPtr&& trailers) override;
-  void decodeMetadata(Envoy::Http::MetadataMapPtr&&) override {}
+  void decodeMetadata(Envoy::Http::MetadataMapPtr&&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // Http::StreamCallbacks
   void onResetStream(Envoy::Http::StreamResetReason reason) override;
-  void onAboveWriteBufferHighWatermark() override {}
-  void onBelowWriteBufferLowWatermark() override {}
+  void onAboveWriteBufferHighWatermark() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void onBelowWriteBufferLowWatermark() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   // ConnectionPool::Callbacks
   void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason,
