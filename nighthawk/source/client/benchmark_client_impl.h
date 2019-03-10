@@ -45,6 +45,8 @@ public:
   // BenchmarkClient
   bool initialize(Envoy::Runtime::Loader& runtime) override;
 
+  void terminate() override;
+
   StatisticPtrMap statistics() const override;
 
   bool measureLatencies() const override { return measure_latencies_; }

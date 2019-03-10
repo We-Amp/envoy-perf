@@ -110,6 +110,7 @@ public:
   ~MockBenchmarkClient();
 
   MOCK_METHOD1(initialize, bool(Envoy::Runtime::Loader&));
+  MOCK_METHOD0(terminate, void());
   MOCK_METHOD1(setMeasureLatencies, void(bool));
   MOCK_CONST_METHOD0(statistics, StatisticPtrMap());
   MOCK_METHOD1(tryStartOne, bool(std::function<void()>));

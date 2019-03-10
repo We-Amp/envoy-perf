@@ -23,6 +23,11 @@ public:
   virtual bool initialize(Envoy::Runtime::Loader& runtime) PURE;
 
   /**
+   * Terminate will be called on the worker thread before it ends.
+   */
+  virtual void terminate() PURE;
+
+  /**
    * Turns latency measurement on or off.
    *
    * @param measure_latencies true iff latencies should be measured.

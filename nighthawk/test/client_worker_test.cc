@@ -89,6 +89,7 @@ TEST_F(ClientWorkerTest, BasicTest) {
     EXPECT_CALL(*sequencer_, statistics())
         .Times(1)
         .WillOnce(testing::Return(createStatisticPtrMap()));
+    EXPECT_CALL(*benchmark_client_, terminate()).Times(1);
   }
 
   int worker_number = 12345;

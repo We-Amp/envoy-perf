@@ -163,6 +163,8 @@ bool BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   return true;
 }
 
+void BenchmarkClientHttpImpl::terminate() { pool_.reset(); }
+
 StatisticPtrMap BenchmarkClientHttpImpl::statistics() const {
   StatisticPtrMap statistics;
   statistics[connect_statistic_->id()] = connect_statistic_.get();
