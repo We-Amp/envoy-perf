@@ -92,7 +92,30 @@ void Main::outputCliStats(const std::vector<StatisticPtr>& merged_statistics) co
   ENVOY_LOG(info, "{}", cli_result);
 }
 
-std::vector<StatisticPtr> Main::runWorkers() {
+std::vector<StatisticPtr>
+Main::mergeWorkerStatistics(const OptionInterpreter& option_interpreter,
+                            const std::vector<ClientWorkerPtr>& workers) const {
+  std::vector<StatisticPtr> merged_statistics;
+  StatisticPtrMap w0_statistics = workers[0]->statistics();
+  for (auto w0_statistic : w0_statistics) {
+    auto new_statistic = option_interpreter.createStatistic();
+    new_statistic->setId(w0_statistic.first);
+    merged_statistics.push_back(std::move(new_statistic));
+  }
+
+  for (auto& w : workers) {
+    uint32_t i = 0;
+    for (auto wx_statistic : w->statistics()) {
+      auto merged = merged_statistics[i]->combine(*(wx_statistic.second));
+      merged->setId(merged_statistics[i]->id());
+      merged_statistics[i] = std::move(merged);
+      i++;
+    }
+  }
+  return merged_statistics;
+}
+
+std::vector<StatisticPtr> Main::runWorkers() const {
   uint32_t concurrency = determineConcurrency();
   // We try to offset the start of each thread so that workers will execute tasks evenly
   // spaced in time.
@@ -129,24 +152,9 @@ std::vector<StatisticPtr> Main::runWorkers() {
     w->waitForCompletion();
   }
 
-  // Compute the merged statistics.
-  std::vector<StatisticPtr> merged_statistics;
-  StatisticPtrMap w0_statistics = workers[0]->statistics();
-  for (auto w0_statistic : w0_statistics) {
-    auto new_statistic = option_interpreter.createStatistic();
-    new_statistic->setId(w0_statistic.first);
-    merged_statistics.push_back(std::move(new_statistic));
-  }
+  auto merged_statistics = mergeWorkerStatistics(option_interpreter, workers);
 
-  for (auto& w : workers) {
-    uint32_t i = 0;
-    for (auto wx_statistic : w->statistics()) {
-      auto merged = merged_statistics[i]->combine(*(wx_statistic.second));
-      merged->setId(merged_statistics[i]->id());
-      merged_statistics[i] = std::move(merged);
-      i++;
-    }
-  }
+  // Compute the merged statistics.
   tls.shutdownGlobalThreading();
   return merged_statistics;
 }

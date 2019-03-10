@@ -29,14 +29,14 @@ class OptionInterpreter {
 public:
   virtual ~OptionInterpreter() = default;
   virtual BenchmarkClientPtr createBenchmarkClient(Envoy::Api::Api& api,
-                                                   Envoy::Event::Dispatcher& dispatcher) PURE;
+                                                   Envoy::Event::Dispatcher& dispatcher) const PURE;
 
-  virtual Envoy::Stats::StorePtr createStatsStore() PURE;
-  virtual StatisticPtr createStatistic() PURE;
-  virtual PlatformUtilPtr getPlatformUtil() PURE;
+  virtual Envoy::Stats::StorePtr createStatsStore() const PURE;
+  virtual StatisticPtr createStatistic() const PURE;
+  virtual PlatformUtilPtr getPlatformUtil() const PURE;
   virtual SequencerPtr createSequencer(Envoy::TimeSource& time_source,
                                        Envoy::Event::Dispatcher& dispatcher,
-                                       BenchmarkClient& benchmark_client) PURE;
+                                       BenchmarkClient& benchmark_client) const PURE;
 };
 
 typedef std::unique_ptr<OptionInterpreter> OptionInterpreterPtr;

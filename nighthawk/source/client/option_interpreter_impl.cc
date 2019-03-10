@@ -15,7 +15,7 @@ OptionInterpreterImpl::OptionInterpreterImpl(const Options& options) : options_(
 
 BenchmarkClientPtr
 OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
-                                             Envoy::Event::Dispatcher& dispatcher) {
+                                             Envoy::Event::Dispatcher& dispatcher) const {
   auto benchmark_client = std::make_unique<BenchmarkClientHttpImpl>(
       api, dispatcher, createStatsStore(), createStatistic(), createStatistic(), options_.uri(),
       options_.h2());
@@ -26,7 +26,7 @@ OptionInterpreterImpl::createBenchmarkClient(Envoy::Api::Api& api,
 
 SequencerPtr OptionInterpreterImpl::createSequencer(Envoy::TimeSource& time_source,
                                                     Envoy::Event::Dispatcher& dispatcher,
-                                                    BenchmarkClient& benchmark_client) {
+                                                    BenchmarkClient& benchmark_client) const {
   RateLimiterPtr rate_limiter =
       std::make_unique<LinearRateLimiter>(time_source, Frequency(options_.requests_per_second()));
   SequencerTarget sequencer_target =
@@ -38,13 +38,15 @@ SequencerPtr OptionInterpreterImpl::createSequencer(Envoy::TimeSource& time_sour
   return sequencer;
 }
 
-Envoy::Stats::StorePtr OptionInterpreterImpl::createStatsStore() {
+Envoy::Stats::StorePtr OptionInterpreterImpl::createStatsStore() const {
   return std::make_unique<Envoy::Stats::IsolatedStoreImpl>();
 }
 
-StatisticPtr OptionInterpreterImpl::createStatistic() { return std::make_unique<HdrStatistic>(); }
+StatisticPtr OptionInterpreterImpl::createStatistic() const {
+  return std::make_unique<HdrStatistic>();
+}
 
-PlatformUtilPtr OptionInterpreterImpl::getPlatformUtil() {
+PlatformUtilPtr OptionInterpreterImpl::getPlatformUtil() const {
   // TODO(oschaaf): singleton?
   return std::make_unique<PlatformUtilImpl>();
 }

@@ -15,14 +15,14 @@ class OptionInterpreterImpl : public OptionInterpreter {
 public:
   OptionInterpreterImpl(const Options& options);
   BenchmarkClientPtr createBenchmarkClient(Envoy::Api::Api& api,
-                                           Envoy::Event::Dispatcher& dispatcher) override;
+                                           Envoy::Event::Dispatcher& dispatcher) const override;
   SequencerPtr createSequencer(Envoy::TimeSource& time_source, Envoy::Event::Dispatcher& dispatcher,
-                               BenchmarkClient& benchmark_client) override;
+                               BenchmarkClient& benchmark_client) const override;
 
-  Envoy::Stats::StorePtr createStatsStore() override;
-  StatisticPtr createStatistic() override;
+  Envoy::Stats::StorePtr createStatsStore() const override;
+  StatisticPtr createStatistic() const override;
   // TODO(oschaaf): revisit, do we want a singleton here?
-  PlatformUtilPtr getPlatformUtil() override;
+  PlatformUtilPtr getPlatformUtil() const override;
 
 private:
   const Options& options_;

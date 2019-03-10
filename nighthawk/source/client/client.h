@@ -5,6 +5,8 @@
 #include "envoy/network/address.h"
 #include "envoy/stats/store.h"
 
+#include "nighthawk/client/client_worker.h"
+#include "nighthawk/client/option_interpreter.h"
 #include "nighthawk/client/options.h"
 #include "nighthawk/common/statistic.h"
 
@@ -21,7 +23,10 @@ public:
 private:
   uint32_t determineConcurrency() const;
   void configureComponentLogLevels(spdlog::level::level_enum level);
-  std::vector<StatisticPtr> runWorkers();
+  std::vector<StatisticPtr> runWorkers() const;
+  std::vector<StatisticPtr>
+  mergeWorkerStatistics(const OptionInterpreter& option_interpreter,
+                        const std::vector<ClientWorkerPtr>& workers) const;
   void outputCliStats(const std::vector<StatisticPtr>& merged_statistics) const;
 
   OptionsPtr options_;

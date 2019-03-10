@@ -77,15 +77,15 @@ public:
   MockOptionInterpreter();
   ~MockOptionInterpreter();
 
-  MOCK_METHOD2(createBenchmarkClient,
-               Client::BenchmarkClientPtr(Envoy::Api::Api& api,
-                                          Envoy::Event::Dispatcher& dispatcher));
-  MOCK_METHOD3(createSequencer,
-               SequencerPtr(Envoy::TimeSource& time_source, Envoy::Event::Dispatcher& dispatcher,
-                            Client::BenchmarkClient& benchmark_client));
-  MOCK_METHOD0(createStatsStore, Envoy::Stats::StorePtr());
-  MOCK_METHOD0(createStatistic, StatisticPtr());
-  MOCK_METHOD0(getPlatformUtil, PlatformUtilPtr());
+  MOCK_CONST_METHOD2(createBenchmarkClient,
+                     Client::BenchmarkClientPtr(Envoy::Api::Api& api,
+                                                Envoy::Event::Dispatcher& dispatcher));
+  MOCK_CONST_METHOD3(createSequencer, SequencerPtr(Envoy::TimeSource& time_source,
+                                                   Envoy::Event::Dispatcher& dispatcher,
+                                                   Client::BenchmarkClient& benchmark_client));
+  MOCK_CONST_METHOD0(createStatsStore, Envoy::Stats::StorePtr());
+  MOCK_CONST_METHOD0(createStatistic, StatisticPtr());
+  MOCK_CONST_METHOD0(getPlatformUtil, PlatformUtilPtr());
 };
 
 class FakeSequencerTarget {
