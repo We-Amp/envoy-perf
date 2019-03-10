@@ -280,8 +280,7 @@ TEST_P(BenchmarkClientTest, UnresolveableHostname) {
   client_ = std::make_unique<Client::BenchmarkClientHttpImpl>(
       api_, *dispatcher_, std::make_unique<Envoy::Stats::IsolatedStoreImpl>(),
       std::make_unique<StreamingStatistic>(), std::make_unique<StreamingStatistic>(),
-      fmt::format("{}://unresolveablefoobarhost:{}{}", "http", getTestServerHostAndPort(), "/"),
-      false);
+      fmt::format("http://unresolveablefoobarhost:80/"), false);
 
   EXPECT_FALSE(client_->initialize(runtime_));
 }

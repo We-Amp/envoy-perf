@@ -6,6 +6,7 @@
 #include "envoy/stats/store.h"
 
 #include "nighthawk/client/options.h"
+#include "nighthawk/common/statistic.h"
 
 namespace Nighthawk {
 namespace Client {
@@ -18,10 +19,13 @@ public:
   bool run();
 
 private:
+  uint32_t determineConcurrency() const;
+  void configureComponentLogLevels(spdlog::level::level_enum level);
+  std::vector<StatisticPtr> runWorkers();
+  void outputCliStats(const std::vector<StatisticPtr>& merged_statistics) const;
+
   OptionsPtr options_;
   std::unique_ptr<Envoy::Logger::Context> logging_context_;
-  Envoy::Network::Address::InstanceConstSharedPtr target_address_;
-  void configureComponentLogLevels(spdlog::level::level_enum level);
 };
 
 } // namespace Client

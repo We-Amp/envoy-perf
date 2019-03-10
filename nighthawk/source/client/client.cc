@@ -19,8 +19,6 @@
 #include "common/runtime/runtime_impl.h"
 #include "common/thread_local/thread_local_impl.h"
 
-#include "nighthawk/common/statistic.h"
-
 #include "nighthawk/source/client/client_worker_impl.h"
 #include "nighthawk/source/client/option_interpreter_impl.h"
 #include "nighthawk/source/client/options_impl.h"
@@ -54,12 +52,7 @@ void Main::configureComponentLogLevels(spdlog::level::level_enum level) {
   logger_to_change->setLevel(level);
 }
 
-bool Main::run() {
-  auto thread_factory = Envoy::Thread::ThreadFactoryImplPosix();
-  Envoy::Thread::MutexBasicLockable log_lock;
-  auto logging_context = std::make_unique<Envoy::Logger::Context>(
-      spdlog::level::from_str(options_->verbosity()), "[%T.%f][%t][%L] %v", log_lock);
-
+uint32_t Main::determineConcurrency() const {
   uint32_t cpu_cores_with_affinity = PlatformUtils::determineCpuCoresWithAffinity();
   if (cpu_cores_with_affinity == 0) {
     ENVOY_LOG(warn, "Failed to determine the number of cpus with affinity to our thread.");
@@ -86,8 +79,30 @@ bool Main::run() {
               options_->connections(), options_->requests_per_second());
   }
 
+  return concurrency;
+}
+
+void Main::outputCliStats(const std::vector<StatisticPtr>& merged_statistics) const {
+  std::string cli_result = "Merged statistics:\n{}";
+  for (auto& statistic : merged_statistics) {
+    cli_result = fmt::format(cli_result, statistic->id() + "\n{}");
+    cli_result = fmt::format(cli_result, statistic->toString() + "\n{}");
+  }
+  cli_result = fmt::format(cli_result, "");
+  ENVOY_LOG(info, "{}", cli_result);
+}
+
+std::vector<StatisticPtr> Main::runWorkers() {
+  uint32_t concurrency = determineConcurrency();
+  // We try to offset the start of each thread so that workers will execute tasks evenly
+  // spaced in time.
+  // E.g.if we have a 10 workers at 10k/second our global pacing is 100k/second (or 1 / 100 usec).
+  // We would then offset the worker starts like [0usec, 10 usec, ..., 90 usec].
+  double inter_worker_delay_usec = (1. / options_->requests_per_second()) * 1000000 / concurrency;
+
   OptionInterpreterImpl option_interpreter(*options_);
 
+  auto thread_factory = Envoy::Thread::ThreadFactoryImplPosix();
   Envoy::Stats::StorePtr store = option_interpreter.createStatsStore();
   Envoy::Event::RealTimeSystem time_system;
   Envoy::Api::Impl api(thread_factory, *store, time_system);
@@ -97,12 +112,6 @@ bool Main::run() {
   tls.registerThread(*main_dispatcher, true);
   Envoy::Runtime::RandomGeneratorImpl generator;
   Envoy::Runtime::LoaderImpl runtime(generator, *store, tls);
-
-  // We try to offset the start of each thread so that workers will execute tasks evenly
-  // spaced in time.
-  // E.g.if we have a 10 workers at 10k/second our global pacing is 100k/second (or 1 / 100 usec).
-  // We would then offset the worker starts like [0usec, 10 usec, ..., 90 usec].
-  double inter_worker_delay_usec = (1. / options_->requests_per_second()) * 1000000 / concurrency;
 
   // We're going to fire up #concurrency benchmark loops and wait for them to complete.
   std::vector<ClientWorkerPtr> workers;
@@ -138,17 +147,18 @@ bool Main::run() {
       i++;
     }
   }
-
   tls.shutdownGlobalThreading();
+  return merged_statistics;
+}
 
-  std::string cli_result = "Merged statistics:\n{}";
-  for (auto& statistic : merged_statistics) {
-    cli_result = fmt::format(cli_result, statistic->id() + "\n{}");
-    cli_result = fmt::format(cli_result, statistic->toString() + "\n{}");
-  }
-  cli_result = fmt::format(cli_result, "");
-  ENVOY_LOG(info, "{}", cli_result);
+bool Main::run() {
+  Envoy::Thread::MutexBasicLockable log_lock;
+  auto logging_context = std::make_unique<Envoy::Logger::Context>(
+      spdlog::level::from_str(options_->verbosity()), "[%T.%f][%t][%L] %v", log_lock);
 
+  auto merged_statistics = runWorkers();
+
+  outputCliStats(merged_statistics);
   // Output the statistics to the proto
   nighthawk::client::Output output;
   output.set_allocated_options(options_->toCommandLineOptions().release());
