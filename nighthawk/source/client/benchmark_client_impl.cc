@@ -186,8 +186,8 @@ bool BenchmarkClientHttpImpl::tryStartOne(std::function<void()> caller_completio
   }
 
   auto stream_decoder = new StreamDecoder(
-      api_.timeSource(), *this, std::move(caller_completion_callback), *connect_statistic_,
-      *response_statistic_, request_headers_, measureLatencies());
+      dispatcher_, api_.timeSource(), *this, std::move(caller_completion_callback),
+      *connect_statistic_, *response_statistic_, request_headers_, measureLatencies());
   requests_initiated_++;
   pool_->newStream(*stream_decoder, *stream_decoder);
   return true;
@@ -210,6 +210,7 @@ std::string BenchmarkClientHttpImpl::countersToString(CounterFilter filter) cons
 void BenchmarkClientHttpImpl::onComplete(bool success, const Envoy::Http::HeaderMap& headers) {
   requests_completed_++;
   if (!success) {
+    // TODO(oschaaf): this information must bubble up!
     stream_reset_count_++;
   } else {
     ASSERT(headers.Status());
