@@ -6,7 +6,7 @@ load(
 
 package(default_visibility = ["//visibility:public"])
 
-envoy_basic_cc_library(
+cc_library(
     name = "hdrhistogram_c",
     srcs = [
         "hdrhistogram_c/src/hdr_encoding.c",
