@@ -23,10 +23,6 @@ function do_coverage() {
     ci/run_coverage.sh
 }
 
-function collect_build_profile() {
-  cp -f "$(bazel info output_base)/command.profile" "${ENVOY_BUILD_PROFILE}/$1.profile" || true
-}
-
 function setup_gcc_toolchain() {
   export CC=gcc
   export CXX=g++
@@ -41,7 +37,7 @@ function setup_clang_toolchain() {
   echo "$CC/$CXX toolchain configured"
 }
 
-function bazel_with_collection() {
+function run_bazel() {
   declare -r BAZEL_OUTPUT="${SRCDIR}"/bazel.output.txt
   bazel $* | tee "${BAZEL_OUTPUT}"
   declare BAZEL_STATUS="${PIPESTATUS[0]}"
@@ -55,14 +51,17 @@ function bazel_with_collection() {
     done
     exit "${BAZEL_STATUS}"
   fi
-  collect_build_profile $1
 }
 
 function do_asan() {
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests..."
+  #clang -v
+  #touch foo.c
+  #lang -ccc-print-bindings foo.c
+  #exit
   cd "${SRCDIR}"
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //nighthawk/test:nighthawk_test
+  run_bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //nighthawk/test:nighthawk_test
 }
 
 
@@ -70,7 +69,7 @@ function do_tsan() {
   echo "bazel TSAN debug build with tests"
   echo "Building and testing envoy tests..."
   cd "${SRCDIR}"
-  bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan //nighthawk/test:nighthawk_test
+  run_bazel test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-tsan //nighthawk/test:nighthawk_test
 }
 
 # TODO(oschaaf): To avoid OOM kicking in, we throttle resources here. Revisit this later
@@ -87,10 +86,7 @@ if [ -n "$CIRCLECI" ]; then
 fi
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-NUM_CPUS=8
-
-# export BAZEL_BUILD_EXTRA_OPTIONS="--linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
-
+NUM_CPUS=32
 
 export BAZEL_BUILD_OPTIONS=" \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
@@ -106,8 +102,6 @@ if [ "$1" == "coverage" ]; then
     setup_gcc_toolchain
     CONCURRENCY=6
 fi
-
-# bazel clean --expunge
 
 case "$1" in
     build)
