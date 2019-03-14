@@ -34,6 +34,7 @@ function setup_gcc_toolchain() {
 }
 
 function setup_clang_toolchain() {
+  export PATH=/usr/lib/llvm-7/bin:$PATH
   export CC=clang
   export CXX=clang++
   export ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-7/bin/llvm-symbolizer
@@ -61,7 +62,6 @@ function do_asan() {
   echo "bazel ASAN/UBSAN debug build with tests"
   echo "Building and testing envoy tests..."
   cd "${SRCDIR}"
-  export ENVOY_CONFIG_ASAN=1
   bazel_with_collection test ${BAZEL_TEST_OPTIONS} -c dbg --config=clang-asan //nighthawk/test:nighthawk_test
 }
 
@@ -87,10 +87,10 @@ if [ -n "$CIRCLECI" ]; then
 fi
 
 [[ -z "${SRCDIR}" ]] && SRCDIR="${PWD}"
-NUM_CPUS=32
+NUM_CPUS=8
 
 # export BAZEL_BUILD_EXTRA_OPTIONS="--linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
-export PPROF_PATH=/thirdparty_build/bin/pprof
+
 
 export BAZEL_BUILD_OPTIONS=" \
   --verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
@@ -99,8 +99,6 @@ export BAZEL_TEST_OPTIONS="${BAZEL_BUILD_OPTIONS} --test_env=HOME --test_env=PYT
   --test_env=UBSAN_OPTIONS=print_stacktrace=1 \
   --cache_test_results=no --test_output=all ${BAZEL_EXTRA_TEST_OPTIONS}"
 
-export BAZEL_BUILD_EXTRA_OPTIONS="--action_env=PATH=/bin:/usr/bin:/usr/lib/llvm-7/bin --linkopt=-fuse-ld=lld --host_linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
-export PATH=/usr/lib/llvm-7/bin:$PATH
 
 setup_clang_toolchain
 

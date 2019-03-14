@@ -73,6 +73,7 @@ public:
   uint32_t getTestServerHostAndSslPort() { return lookupPort("listener_1"); }
 
   void TearDown() override {
+    client_->terminate();
     test_server_.reset();
     fake_upstreams_.clear();
     tls_.shutdownGlobalThreading();
