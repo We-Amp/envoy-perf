@@ -133,6 +133,7 @@ public:
   MOCK_CONST_METHOD0(statistics, StatisticPtrMap());
   MOCK_METHOD1(tryStartOne, bool(std::function<void()>));
   MOCK_CONST_METHOD0(store, Envoy::Stats::Store&());
+  MOCK_METHOD0(prefetchPoolConnections, void());
 
 protected:
   MOCK_CONST_METHOD0(measureLatencies, bool());

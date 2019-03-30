@@ -43,6 +43,12 @@ struct BenchmarkClientStats {
   ALL_BENCHMARK_CLIENT_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class PrefetchablePool {
+public:
+  virtual ~PrefetchablePool() = default;
+  virtual void prefetchConnections() PURE;
+};
+
 class BenchmarkClientHttpImpl : public BenchmarkClient,
                                 public StreamDecoderCompletionCallback,
                                 public Envoy::Logger::Loggable<Envoy::Logger::Id::main> {
@@ -67,7 +73,9 @@ public:
   }
   bool tryStartOne(std::function<void()> caller_completion_callback) override;
   Envoy::Stats::Store& store() const override { return store_; }
-
+  void prefetchPoolConnections() override {
+    dynamic_cast<PrefetchablePool*>(pool_.get())->prefetchConnections();
+  }
   // StreamDecoderCompletionCallback
   void onComplete(bool success, const Envoy::Http::HeaderMap& headers) override;
   void onPoolFailure(Envoy::Http::ConnectionPool::PoolFailureReason reason) override;

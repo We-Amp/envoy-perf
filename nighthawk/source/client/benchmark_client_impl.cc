@@ -50,6 +50,32 @@ BenchmarkClientHttpImpl::BenchmarkClientHttpImpl(Envoy::Api::Api& api,
                                             : Envoy::Http::Headers::get().SchemeValues.Http);
 }
 
+class H1Pool : public PrefetchablePool, public Envoy::Http::Http1::ProdConnPoolImpl {
+public:
+  H1Pool(Envoy::Event::Dispatcher& dispatcher, Envoy::Upstream::HostConstSharedPtr host,
+         Envoy::Upstream::ResourcePriority priority,
+         const Envoy::Network::ConnectionSocket::OptionsSharedPtr& options)
+      : Envoy::Http::Http1::ProdConnPoolImpl(dispatcher, host, priority, options) {}
+
+  void prefetchConnections() {
+    while (host_->cluster().resourceManager(priority_).connections().canCreate()) {
+      createNewConnection();
+    }
+  }
+};
+
+class H2Pool : public PrefetchablePool, public Envoy::Http::Http2::ProdConnPoolImpl {
+public:
+  H2Pool(Envoy::Event::Dispatcher& dispatcher, Envoy::Upstream::HostConstSharedPtr host,
+         Envoy::Upstream::ResourcePriority priority,
+         const Envoy::Network::ConnectionSocket::OptionsSharedPtr& options)
+      : Envoy::Http::Http2::ProdConnPoolImpl(dispatcher, host, priority, options) {}
+
+  void prefetchConnections() {
+    // No-op, this is a "pool" with a single connection.
+  }
+};
+
 void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   ASSERT(uri_.address().get() != nullptr);
   envoy::api::v2::Cluster cluster_config;
@@ -124,11 +150,11 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   Envoy::Network::ConnectionSocket::OptionsSharedPtr options =
       std::make_shared<Envoy::Network::ConnectionSocket::Options>();
   if (use_h2_) {
-    pool_ = std::make_unique<Envoy::Http::Http2::ProdConnPoolImpl>(
-        dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
+    pool_ = std::make_unique<H2Pool>(dispatcher_, host, Envoy::Upstream::ResourcePriority::Default,
+                                     options);
   } else {
-    pool_ = std::make_unique<Envoy::Http::Http1::ProdConnPoolImpl>(
-        dispatcher_, host, Envoy::Upstream::ResourcePriority::Default, options);
+    pool_ = std::make_unique<H1Pool>(dispatcher_, host, Envoy::Upstream::ResourcePriority::Default,
+                                     options);
   }
 }
 

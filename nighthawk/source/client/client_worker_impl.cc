@@ -23,6 +23,7 @@ void ClientWorkerImpl::simpleWarmup() {
   // completions are fast enough. While this may be an assert, it may also be annoying
   // when comparing results to some other tools, which do open up the specified amount
   // of connections.
+  benchmark_client_->prefetchPoolConnections();
   benchmark_client_->tryStartOne([this] { dispatcher_->exit(); });
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
 }
