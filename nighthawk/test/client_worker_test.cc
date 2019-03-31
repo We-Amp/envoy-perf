@@ -73,6 +73,7 @@ TEST_F(ClientWorkerTest, BasicTest) {
     testing::InSequence dummy;
 
     EXPECT_CALL(*benchmark_client_, initialize).Times(1);
+    EXPECT_CALL(*benchmark_client_, prefetchPoolConnections).Times(1);
     EXPECT_CALL(*sequencer_, start).Times(1);
     EXPECT_CALL(*sequencer_, waitForCompletion).Times(1);
   }

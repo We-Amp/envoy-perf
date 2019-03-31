@@ -142,7 +142,7 @@ bool Main::runWorkers(const BenchmarkClientFactory& benchmark_client_factory,
   Uri uri = Uri::Parse(options_->uri());
   tls.registerThread(*main_dispatcher, true);
   try {
-    uri.resolve(*main_dispatcher, Envoy::Network::DnsLookupFamily::Auto);
+    uri.resolve(*main_dispatcher, Envoy::Network::DnsLookupFamily::V4Only);
   } catch (const UriException) {
     tls.shutdownGlobalThreading();
     return false;

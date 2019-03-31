@@ -16,34 +16,23 @@ ClientWorkerImpl::ClientWorkerImpl(Envoy::Api::Api& api, Envoy::ThreadLocal::Ins
       sequencer_(sequencer_factory.create(time_source_, *dispatcher_, *benchmark_client_)) {}
 
 void ClientWorkerImpl::simpleWarmup() {
-  ENVOY_LOG(debug, "> worker {}: warming up.", worker_number_);
-  // TODO(oschaaf): Maybe add BenchmarkClient::warmup() and call that here.
-  // Ideally that would warm up the pool better, by prefetching the requested amount of
-  // connections. Currently it is possible to use less connections then specified if
-  // completions are fast enough. While this may be an assert, it may also be annoying
-  // when comparing results to some other tools, which do open up the specified amount
-  // of connections.
+  ENVOY_LOG(debug, "> worker {}: warmup start.", worker_number_);
   benchmark_client_->prefetchPoolConnections();
   benchmark_client_->tryStartOne([this] { dispatcher_->exit(); });
   dispatcher_->run(Envoy::Event::Dispatcher::RunType::Block);
+  ENVOY_LOG(debug, "> worker {}: warmup done.", worker_number_);
 }
 
 void ClientWorkerImpl::delayStart() {
   PlatformUtilImpl platform_util;
-  // TODO(oschaaf): We could use dispatcher to sleep, but currently it has a 1 ms resolution
-  // which is rather coarse for our purpose here.
-  // TODO(oschaaf): Instead of usleep, it would perhaps be better to provide an absolute
-  // starting time to wait for in a (spin loop of the) sequencer implementation for high
-  // accuracy when releasing the initial requests.
-  ENVOY_LOG(debug, "> worker {}: waiting", worker_number_);
+  ENVOY_LOG(debug, "> worker {}: waiting for designated time to start", worker_number_);
   int count = 0;
   while (time_source_.monotonicTime() < starting_time_) {
     count++;
     platform_util.yieldCurrentThread();
   }
   if (count == 0) {
-    ENVOY_LOG(warn,
-              "> worker {} arrived late and did not have to spin/wait for its turn to start.");
+    ENVOY_LOG(warn, "> worker {} arrived late and did not spin/wait for its turn to start.");
   }
   ENVOY_LOG(debug, "> worker {}: started", worker_number_);
 }
