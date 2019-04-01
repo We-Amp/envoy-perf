@@ -29,6 +29,15 @@ static_resources:
           - name: envoy.router
             config:
               dynamic_stats: false
+      tls_context:
+        common_tls_context:
+          tls_params:
+            cipher_suites: "-ALL:[ECDHE-RSA-AES128-GCM-SHA256]:"
+          tls_certificates:
+            - certificate_chain:
+                filename: "tools/servercert.pem"
+              private_key:
+                filename: "tools/serverkey.pem"
 admin:
   access_log_path: /tmp/envoy.log
   address:

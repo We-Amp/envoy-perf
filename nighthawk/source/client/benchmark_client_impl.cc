@@ -82,11 +82,13 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
   envoy::api::v2::core::BindConfig bind_config;
 
   cluster_config.mutable_connect_timeout()->set_seconds(timeout_.count());
+  cluster_config.mutable_max_requests_per_connection()->set_value(1);
   auto thresholds = cluster_config.mutable_circuit_breakers()->add_thresholds();
 
   thresholds->mutable_max_retries()->set_value(0);
   thresholds->mutable_max_connections()->set_value(connection_limit_);
   thresholds->mutable_max_pending_requests()->set_value(max_pending_requests_);
+  thresholds->mutable_max_requests()->set_value(1);
 
   Envoy::Network::TransportSocketFactoryPtr socket_factory;
 
@@ -100,8 +102,10 @@ void BenchmarkClientHttpImpl::initialize(Envoy::Runtime::Loader& runtime) {
       common_tls_context->add_alpn_protocols("http/1.1");
     }
     auto transport_socket = cluster_config.transport_socket();
+    cluster_config.mutable_tls_context()->mutable_max_session_keys()->set_value(0);
     if (!cluster_config.has_transport_socket()) {
       ASSERT(cluster_config.has_tls_context());
+      // cluster_config.mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params()->mutab
       transport_socket.set_name(
           Envoy::Extensions::TransportSockets::TransportSocketNames::get().Tls);
       transport_socket.mutable_typed_config()->PackFrom(cluster_config.tls_context());
