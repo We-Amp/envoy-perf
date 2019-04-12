@@ -24,9 +24,14 @@ typedef Envoy::ConstSingleton<HeaderNameValues> HeaderNames;
 class HttpTestServerDecoderFilterConfig {
 public:
   HttpTestServerDecoderFilterConfig(const nighthawk::server::TestServer& proto_config);
-  const nighthawk::server::TestServer& server_config() { return server_config_; }
+  const nighthawk::server::TestServer& server_config() const { return server_config_; }
+  const nighthawk::server::TestServer& persisted_config() const { return persisted_config_; }
+  void set_persisted_config(const nighthawk::server::TestServer& config) {
+    persisted_config_ = config;
+  }
 
 private:
+  nighthawk::server::TestServer persisted_config_;
   const nighthawk::server::TestServer server_config_;
 };
 
